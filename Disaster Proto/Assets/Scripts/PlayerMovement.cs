@@ -8,10 +8,14 @@ public class PlayerMovement : MonoBehaviour {
 
 	public float speed;
 	public float accel;
+	public float thrust;
 	public float hopStrength;
 	public float hopBuild;
 	public float skipStrength;
 	public float skipBuild;
+
+	public int fuelCapacity;
+	private int fuel;
 
 	private bool isGrounded = false;
 	private bool isAlive = true;
@@ -35,31 +39,38 @@ public class PlayerMovement : MonoBehaviour {
 		body = GetComponent<Rigidbody> ();
 		body.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
 		turnStrength = new Vector3 (0, 0.75f, 0);
+
+		fuel = fuelCapacity * 800;
 	}
 	
 	// Update is called once per frame
 	void Update () {
 		
 		// kill the robot if they've fallen into the void
-		if (body.position.y == -10) {
+		if (isAlive && body.position.y < -100) {
+			Debug.Log ("killed by ABYSS");
 			isAlive = false;
 		}
 
-		// stop the robot from moving if they're not alive
-		if (!isAlive) {
-			body.velocity *= 0;
-		} else {
+		// only move if the robot is alive
+		if (isAlive) {
 
-			// accelerating forward
-			if (Input.GetKey (KeyCode.W)) {
-				body.AddRelativeForce (Vector3.forward * accel);
-			} else if (Input.GetKeyUp (KeyCode.W)) {
-
-			} else if (Input.GetKey (KeyCode.S)) {
-				body.AddRelativeForce (Vector3.back * accel);
-			} else if (Input.GetKeyUp (KeyCode.S)) {
-
+			// accelerating forward on the ground
+			if (Input.GetKey (KeyCode.W) && isGrounded && body.velocity.magnitude < speed) {
+				body.AddRelativeForce (Vector3.forward * 15 * accel);
+			} else if (Input.GetKey (KeyCode.S) && body.velocity.magnitude < (speed / 2)) {
+				body.AddRelativeForce (Vector3.back * 15 * accel);
 			}
+			else if (Input.GetKey (KeyCode.LeftShift) && fuel > 0) {
+				if (isGrounded && body.velocity.magnitude < speed) {
+					body.AddRelativeForce (Vector3.forward * 15 * thrust);
+				} else {
+					body.AddRelativeForce (Vector3.forward * 5 * thrust);
+				}
+				fuel -= 2;
+				Debug.Log (100 * fuel / (fuelCapacity * 800) + "%");
+			}
+
 
 			// turning left and right
 			if (Input.GetKey (KeyCode.A)) {
@@ -81,43 +92,38 @@ public class PlayerMovement : MonoBehaviour {
 			}
 
 			// skipping
-			if (Input.GetKey (KeyCode.LeftShift) && isGrounded) {
+			if (Input.GetKey (KeyCode.LeftControl) && isGrounded) {
 				if (skipPow >= skipStrength) {
 					skipPow = skipStrength;
 				} else {
-					skipPow += 0.01f * skipBuild;
+					skipPow += 0.005f * skipBuild;
 				}
-			} else if (Input.GetKeyUp (KeyCode.LeftShift)) {
+			} else if (Input.GetKeyUp (KeyCode.LeftControl)) {
 				Skip ();
 				skipPow = 0f;
 			}
 		}
 	} 
 
-	void Accelerate(bool isForward) {
-		if (isGrounded) {
-			transform.Translate (Vector3.forward * speed);
-		}
-	}
-
+	// launches the robot straight into the air
 	void Hop() {
 		if (isGrounded) {
 			Debug.Log ("hopping: " + hopPow);
-			body.AddForce (Vector3.up * hopPow * 1000);
+			body.AddForce (Vector3.up * hopPow * 400);
 			isGrounded = false;
 		}
 	}
 
+	// launches the robot forward in an arc
 	void Skip() {
 		if (isGrounded) {
 			Debug.Log ("skipping: " + skipPow);
-			body.AddRelativeForce (new Vector3(0, skipPow * 500, skipPow * 1000));
+			body.AddRelativeForce (new Vector3(0, skipPow * 300, skipPow * 600));
 			isGrounded = false;
 		}
 	}
 
 	void OnCollisionEnter(Collision col) {
-		
 		if (col.gameObject.tag == "Ground") { isGrounded = true; }
 	}
 }
