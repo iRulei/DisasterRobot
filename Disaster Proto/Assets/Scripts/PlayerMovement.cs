@@ -32,11 +32,10 @@ public class PlayerMovement : MonoBehaviour {
 		// fetches the current level number for reference later
 //		sceneNum = SceneManager.GetActiveScene ().buildIndex;
 
-		// initializes the robot's velocity and heading
+		// initializes the robot
 		body = GetComponent<Rigidbody> ();
 		body.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
-		turnVector = new Vector3 (0, (float)(0.70 + 0.20 * efficiency), 0);
-
+		turnVector = new Vector3 (0, (float)(0.20 * efficiency + 0.70), 0);
 		fuel = fuelCapacity * 500;
 	}
 	
@@ -49,8 +48,18 @@ public class PlayerMovement : MonoBehaviour {
 			isAlive = false;
 		}
 
+		//Debug.Log(body.velocity.z + "m/s");
+
 		// only move if the robot is alive
 		if (isAlive) {
+
+			if (!isGrounded) {
+				if (body.velocity.z > 0) {
+					body.AddRelativeForce (Vector3.back * 10);
+				} else if (body.velocity.z < 0) {
+					body.AddRelativeForce (Vector3.forward * 2);
+				}
+			}
 
 			// use W and S to move forward and back, limited by maximum speed
 			if (Input.GetKey (KeyCode.W) && isGrounded && body.velocity.magnitude < (speed + 4)) {
@@ -92,7 +101,7 @@ public class PlayerMovement : MonoBehaviour {
 					body.AddRelativeForce (Vector3.up * (int)(2.5 * thrust + 150));
 					fuel -= 2;
 					isGrounded = false;
-					Debug.Log (100 * fuel / (fuelCapacity * 500) + "% (ventral thrusters at " + (int)(2.5 * thrust + 150) + ")");
+					//Debug.Log (100 * fuel / (fuelCapacity * 500) + "% (ventral thrusters at " + (int)(2.5 * thrust + 150) + ")");
 				}
 			// execute a hop when the SPACE key is released
 			} else if (Input.GetKeyUp (KeyCode.Space) && !Input.GetKey (KeyCode.LeftControl)) {
@@ -117,12 +126,12 @@ public class PlayerMovement : MonoBehaviour {
 				// fire anterior thrusters if they are engaged with L-CTRL
 				} else if (Input.GetKey (KeyCode.LeftControl) && fuel > 0 && body.velocity.z < (float)(thrust)) {
 					if (isGrounded) {
-						body.AddRelativeForce (Vector3.forward * (int)(10 * thrust + 150));
+						body.AddRelativeForce (Vector3.forward * (int)(5 * thrust + 150));
 					} else {
-						body.AddRelativeForce (Vector3.forward * (int)(5 * thrust));
+						body.AddRelativeForce (Vector3.forward * (int)(5 * thrust + 25));
 					}
 					fuel -= 1;
-					Debug.Log (100 * fuel / (fuelCapacity * 500) + "% (anterior thrusters at " + (int)(10 * thrust + 150) + ")");
+					//Debug.Log (100 * fuel / (fuelCapacity * 500) + "% fuel (anterior thrusters at " + (int)(10 * thrust + 150) + ")");
 				}
 			// execute a skip when the L-SHIFT key is released
 			} else if (Input.GetKeyUp (KeyCode.LeftShift) && !Input.GetKey (KeyCode.LeftControl)) {
