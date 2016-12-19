@@ -20,8 +20,7 @@ public class PlayerMovement : MonoBehaviour {
 
 	private float hopPow;
 	private float skipPow;
-
-	private Vector3 turnStrength;
+	private Vector3 turnVector;
 
 //	private int sceneNum;
 
@@ -36,7 +35,7 @@ public class PlayerMovement : MonoBehaviour {
 		// initializes the robot's velocity and heading
 		body = GetComponent<Rigidbody> ();
 		body.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
-		turnStrength = new Vector3 (0, 0.75f, 0);
+		turnVector = new Vector3 (0, (float)(0.70 + 0.20 * efficiency), 0);
 
 		fuel = fuelCapacity * 500;
 	}
@@ -54,18 +53,26 @@ public class PlayerMovement : MonoBehaviour {
 		if (isAlive) {
 
 			// use W and S to move forward and back, limited by maximum speed
-			if (Input.GetKey (KeyCode.W) && isGrounded && body.velocity.magnitude < (speed * 2)) {
-				body.AddRelativeForce (Vector3.forward * (15 * efficiency + 150));
-			} else if (Input.GetKey (KeyCode.S) && isGrounded && body.velocity.magnitude < (speed)) {
-				body.AddRelativeForce (Vector3.back * 15 * efficiency);
+			if (Input.GetKey (KeyCode.W) && isGrounded && body.velocity.magnitude < (speed + 4)) {
+				body.AddRelativeForce (Vector3.forward * (5 * efficiency + 150));
+			} else if (Input.GetKey (KeyCode.S) && isGrounded && body.velocity.magnitude < (speed + 2)) {
+				body.AddRelativeForce (Vector3.back * (5 * efficiency + 150));
 			}
 
 
 			// TURNING LEFT and RIGHT
 			if (Input.GetKey (KeyCode.A)) {
-				transform.Rotate (-turnStrength, Space.Self);
+				if (isGrounded) {
+					transform.Rotate (-turnVector, Space.Self);
+				} else {
+					body.AddRelativeTorque (0, -((5 + thrust) / 20), 0);
+				}
 			} else if (Input.GetKey (KeyCode.D)) {
-				transform.Rotate (turnStrength, Space.Self);
+				if (isGrounded) {
+					transform.Rotate (turnVector, Space.Self);
+				} else {
+					body.AddRelativeTorque (0, ((5 + thrust) / 20), 0);
+				}
 			}
 
 
@@ -77,13 +84,14 @@ public class PlayerMovement : MonoBehaviour {
 					if (hopPow >= hop) {
 						hopPow = hop;
 					} else {
-						hopPow += 0.01f * efficiency;
+						hopPow += (0.01f * efficiency) + 0.01f;
 					}
 					Debug.Log ("hop: " + hopPow);
 				// fire ventral thrusters if they are engaged with L-CTRL
 				} else if (Input.GetKey (KeyCode.LeftControl) && fuel > 0 && body.velocity.y < (float)(thrust)) {
 					body.AddRelativeForce (Vector3.up * (int)(2.5 * thrust + 150));
 					fuel -= 2;
+					isGrounded = false;
 					Debug.Log (100 * fuel / (fuelCapacity * 500) + "% (ventral thrusters at " + (int)(2.5 * thrust + 150) + ")");
 				}
 			// execute a hop when the SPACE key is released
@@ -103,11 +111,11 @@ public class PlayerMovement : MonoBehaviour {
 					if (skipPow >= skip) {
 						skipPow = skip;
 					} else {
-						skipPow += 0.005f * efficiency;
+						skipPow += (0.005f * efficiency) + 0.005f;
 					}
 					Debug.Log ("skip: " + skipPow);
 				// fire anterior thrusters if they are engaged with L-CTRL
-				} else if (Input.GetKey (KeyCode.LeftControl) && fuel > 0 && body.velocity.magnitude < (float)(thrust)) {
+				} else if (Input.GetKey (KeyCode.LeftControl) && fuel > 0 && body.velocity.z < (float)(thrust)) {
 					if (isGrounded) {
 						body.AddRelativeForce (Vector3.forward * (int)(10 * thrust + 150));
 					} else {
@@ -128,15 +136,15 @@ public class PlayerMovement : MonoBehaviour {
 
 	// launches the robot straight into the air
 	void Hop() {
-		Debug.Log ("Hopping (" + hopPow + ")");
-		body.AddForce (Vector3.up * hopPow * 1000);
+		Debug.Log ("Hopping (" + (400 * hopPow + 2400) + ")");
+		body.AddForce (Vector3.up * (400 * hopPow + 2400));
 		isGrounded = false;
 	}
 
 	// launches the robot forward in an arc
 	void Skip() {
-		Debug.Log ("Skipping (" + skipPow + ")");
-		body.AddRelativeForce (new Vector3(0, skipPow * 750, skipPow * 1500));
+		Debug.Log ("Skipping (" + (500 * skipPow + 3000) + ")");
+		body.AddRelativeForce (new Vector3(0, (250 * skipPow + 1500), (500 * skipPow + 3000)));
 		isGrounded = false;
 	}
 
