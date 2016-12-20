@@ -60,9 +60,9 @@ public class PlayerMovement : MonoBehaviour {
 		}
 
 		// Useful debugging output about the robot's status
-		//Debug.Log(body.velocity.z + "m/s");
-		//Debug.Log(IsGrounded());
-		Debug.Log("hopCD\t" + ableDict["hop"].IsReady + "\nskipCD\t" + ableDict["skip"].IsReady);
+		//Debug.Log(body.velocity.z + "m/s");															// show forward velocity
+		//Debug.Log(IsGrounded());																		// show grounded state
+		//Debug.Log("hopCD\t" + ableDict["hop"].IsReady + "\nskipCD\t" + ableDict["skip"].IsReady);		// show hop and skip cooldowns
 
 		// only move if the robot is alive
 		if (isAlive) {
@@ -107,7 +107,7 @@ public class PlayerMovement : MonoBehaviour {
 					if (hopPow >= jump) {
 						hopPow = jump;
 					} else {
-						hopPow += (0.01f * efficiency) + 0.01f;
+						hopPow += (0.001f * efficiency) + 0.01f;
 					}
 					Debug.Log ("building hop...\t" + hopPow);
 				// fire ventral thrusters if they are engaged with L-CTRL
@@ -119,6 +119,7 @@ public class PlayerMovement : MonoBehaviour {
 			// execute a hop when the SPACE key is released
 			} else if (Input.GetKeyUp (KeyCode.Space) && !Input.GetKey (KeyCode.LeftControl)) {
 				if (IsGrounded() && ableDict["hop"].IsReady) {
+					hopPow = (int)hopPow;
 					Hop ();
 				}
 				hopPow = 0f;
@@ -133,7 +134,9 @@ public class PlayerMovement : MonoBehaviour {
 					if (skipPow >= jump) {
 						skipPow = jump;
 					} else {
-						skipPow += (0.0005f * efficiency) + (0.025f * skipPow);
+						//skipPow += (0.0005f * efficiency) + (0.025f * skipPow);
+						//skipPow += (0.0005f * efficiency) + (0.0125f * skipPow);
+						skipPow += (0.001f * efficiency) + 0.01f;
 					}
 					Debug.Log ("building skip...\t" + skipPow);
 				// fire anterior thrusters if they are engaged with L-CTRL
@@ -149,26 +152,13 @@ public class PlayerMovement : MonoBehaviour {
 			// execute a skip when the L-SHIFT key is released
 			} else if (Input.GetKeyUp (KeyCode.LeftShift) && !Input.GetKey (KeyCode.LeftControl)) {
 				if (IsGrounded() && ableDict["skip"].IsReady) {
+					skipPow = (int)skipPow;
 					Skip ();
 				}
 				skipPow = 0f;
 			}
 		}
 	} 
-
-	// launches the robot straight into the air
-	private void Hop() {
-		Debug.Log ("Hopping (" + (400 * hopPow + 2400) + ")");
-		body.AddForce (Vector3.up * (400 * hopPow + 2400));
-		ableDict["hop"].ActivateCoolDown();
-	}
-
-	// launches the robot forward in an arc
-	private void Skip() {
-		Debug.Log ("Skipping (" + (1200 * skipPow + 2000) + "Z, " + (240 * skipPow + 400) + "Y)");
-		body.AddRelativeForce (new Vector3(0, (240 * skipPow + 400), (1200 * skipPow + 2000)));
-		ableDict["skip"].ActivateCoolDown();
-	}
 
 	bool IsGrounded() {
 		return Physics.Raycast (transform.position, Vector3.down, (float)(groundRay + 0.1f));
@@ -179,9 +169,30 @@ public class PlayerMovement : MonoBehaviour {
 //	}
 
 	private void RegisterAbilities () {
-		Debug.Log ("registering abilities");
-		ableDict.Add ("hop", new RobotAbility("hop", (3250 - efficiency * 250)));
-		ableDict.Add ("skip", new RobotAbility ("skip", (3250 - efficiency * 250)));
+		ableDict.Add ("hop", new RobotAbility("hop", (1125 - efficiency * 125)));
+		ableDict.Add ("skip", new RobotAbility ("skip", (1125 - efficiency * 125)));
+	}
+
+	// launches the robot straight into the air
+	private void Hop() {
+		if (hopPow > 0) {
+			Debug.Log ("Hopping (" + (500 * hopPow + 2500) + ")");
+			body.AddForce (Vector3.up * (500 * hopPow + 2500));
+		} else {
+			Debug.Log ("Hop Aborted");
+		}
+		ableDict["hop"].ActivateCoolDown();
+	}
+
+	// launches the robot forward in an arc
+	private void Skip() {
+		if (skipPow > 0) {
+			Debug.Log ("Skipping (" + (750 * skipPow + 3250) + "Z, " + (200 * skipPow + 1300) + "Y)");
+			body.AddRelativeForce (new Vector3 (0, (200 * skipPow + 1300), (750 * skipPow + 3250)));
+		} else {
+			Debug.Log ("Skip Aborted");
+		}
+		ableDict["skip"].ActivateCoolDown();
 	}
 
 	/// <summary>
@@ -206,19 +217,16 @@ public class PlayerMovement : MonoBehaviour {
 			name = inName;
 			interval = cooldown;
 			timer = new Timer (interval);
-			timer.Elapsed += ReadyAbility;
+			timer.Elapsed += (object sender, ElapsedEventArgs e) => { timer.Stop(); isReady = true; };
 			isReady = true;
 		}
 
+		/// <summary>
+		/// Flags the ability as not ready and starts its cooldown timer.
+		/// </summary>
 		public void ActivateCoolDown() {
 			isReady = false;
 			timer.Start ();
-		}
-
-		public void ReadyAbility(object sender, ElapsedEventArgs e) {
-			isReady = true;
-			timer = new Timer (interval);
-			timer.Elapsed += ReadyAbility;
 		}
 	}
 }

@@ -6,19 +6,36 @@
 
 \f0\fs24 \cf0 DISASTER ROBOT MECHANICS\
 \
-The robot has 7 stats:\
+	THE ROBOT HAS 6 STATS\
+\
 : SPEED determines the maximum forward velocity the robot can achieve using its mechanical locomotion assembly.\
+		v_max = SPEED + 4\
+\
 : THRUST determines the strength of the robot\'92s propulsion and turning thrusters.\
-: JUMP determines the power of the robot\'92s hopping and skipping assemblies\
-: EFFICIENCY contribute to numerous minor working parameters, including mechanical turning speed, the rate at which hops and skips build power, and the rate at which cooldowns expire.\
+: JUMP determines the power of the robot\'92s hopping and skipping assemblies.\
+		\ul JMP		hop height		skip distance\ulnone \
+		1		~ 4.0m		~10.5m\
+		2		~ 5.4m		~14.4m\
+		3		~ 6.8m		~19.0m\
+		4		~ 8.5m		~24.0m\
+		5		~10.5m		~29.9m\
 \
-The robot\'92s cooldowns are stored as follows:\
-: An array of floats exists as a private member.\
-: When an action with a cooldown is executed, that action\'92s cooldown is set.\
+: EFFICIENCY contributes to numerous minor working parameters, including mechanical turning speed, the rate at which hops and skips build power, and the rate at which cooldowns expire.\
+: FUEL CAPACITY determines how much fuel the robot can store.\
 \
-	coolDowns Index		Action		Cooldown\
-		0			hop			2.0f\
-		1			skip			1.0f\
 \
-: On each frame, UpdateCooldowns() is called.\
-: This method subtracts a small amount from each }
+\
+	EQUIPMENT COOLDOWNS\
+\
+: There is a RobotAbility class that stores a name, a timer, and an isReady bool.\
+: All of the robot\'92s RobotAbilities are stored in a dictionary indexed by name.\
+: Activating an ability (e.g. hop, harpoon) calls its ActivateCooldown() which sets isReady to \'91false\'92 and starts the timer.\
+: When the timer is elapsed, the timer stops and isReady is set to \'91true\'92.\
+\
+\
+\
+	HOP and SKIP\
+\
+: Holding the key down builds up hop/skip.\
+: Releasing the key truncates the current hopPow/skipPow to create a step-wise relationship between hopPow/skipPow and the height/distance covered.\
+: Each step below maximum power represents a decremented JMP value, so at JMP = 1 you can perform JMP = 0-1 jumps, at JMP = 5 you can perform JMP = 0-5 jumps, etc, with the proper timing.}
