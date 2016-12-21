@@ -13,6 +13,7 @@ public class PlayerMovement : MonoBehaviour {
 	public float efficiency;
 	public int fuelCapacity;
 
+	private float zSpeed;
 	private float hopPow;
 	private float skipPow;
 	private int fuel;
@@ -59,26 +60,29 @@ public class PlayerMovement : MonoBehaviour {
 			isAlive = false;
 		}
 
+		zSpeed = transform.InverseTransformDirection (body.velocity).z;
+
 		// Useful debugging output about the robot's status
-		//Debug.Log(body.velocity.z + "m/s");															// show forward velocity
+		Debug.Log(zSpeed + "m/s");																		// show forward velocity
 		//Debug.Log(IsGrounded());																		// show grounded state
 		//Debug.Log("hopCD\t" + ableDict["hop"].IsReady + "\nskipCD\t" + ableDict["skip"].IsReady);		// show hop and skip cooldowns
 
 		// only move if the robot is alive
 		if (isAlive) {
 
+			// stabilize the robot's movement along its Z-axis
 			if (!IsGrounded()) {
-				if (body.velocity.z > 0) {
+				if (zSpeed > 0) {
 					body.AddRelativeForce (Vector3.back * 10);
-				} else if (body.velocity.z < 0) {
-					body.AddRelativeForce (Vector3.forward * 10);
+				} else if (zSpeed < 0) {
+					body.AddRelativeForce (Vector3.forward * 2);
 				}
 			}
 
 			// use W and S to move forward and back, limited by maximum speed
-			if (Input.GetKey (KeyCode.W) && IsGrounded() && body.velocity.magnitude < (speed + 4)) {
+			if (Input.GetKey (KeyCode.W) && IsGrounded() && zSpeed < (speed + 4)) {
 				body.AddRelativeForce (Vector3.forward * (5 * efficiency + 150));
-			} else if (Input.GetKey (KeyCode.S) && IsGrounded() && body.velocity.magnitude < (speed + 2)) {
+			} else if (Input.GetKey (KeyCode.S) && IsGrounded() && zSpeed < (speed + 2)) {
 				body.AddRelativeForce (Vector3.back * (5 * efficiency + 150));
 			}
 
@@ -140,7 +144,7 @@ public class PlayerMovement : MonoBehaviour {
 					}
 					Debug.Log ("building skip...\t" + skipPow);
 				// fire anterior thrusters if they are engaged with L-CTRL
-				} else if (Input.GetKey (KeyCode.LeftControl) && fuel > 0 && body.velocity.z < (float)(thrust)) {
+				} else if (Input.GetKey (KeyCode.LeftControl) && fuel > 0 && zSpeed < (float)(thrust + 4)) {
 					if (IsGrounded()) {
 						body.AddRelativeForce (Vector3.forward * (int)(5 * thrust + 150));
 					} else {
