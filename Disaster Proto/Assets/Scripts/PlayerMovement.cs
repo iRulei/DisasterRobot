@@ -39,6 +39,7 @@ public class PlayerMovement : MonoBehaviour {
 		// initializes the robot
 		body = GetComponent<Rigidbody> ();
 		body.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+		body.maxAngularVelocity = 1.5f;
 		robotCollider = gameObject.GetComponent<BoxCollider> ();
 		groundRay = robotCollider.bounds.extents.y;
 		turnVector = new Vector3 (0, (float)(0.20 * efficiency + 0.70), 0);
@@ -48,7 +49,7 @@ public class PlayerMovement : MonoBehaviour {
 		RegisterAbilities ();
 		hopPow = 0;
 		skipPow = 0;
-		fuel = fuelCapacity * 500;
+		fuel = fuelCapacity * 1000;
 	}
 	
 	// Update is called once per frame
@@ -59,13 +60,14 @@ public class PlayerMovement : MonoBehaviour {
 			Debug.Log ("killed by ABYSS");
 			isAlive = false;
 		}
-
-		zSpeed = transform.InverseTransformDirection (body.velocity).z;
-
+			
 		// Useful debugging output about the robot's status
-		Debug.Log(zSpeed + "m/s");																		// show forward velocity
+		//Debug.Log(zSpeed + "m/s");																	// show forward velocity
+		Debug.Log(body.angularVelocity);
 		//Debug.Log(IsGrounded());																		// show grounded state
 		//Debug.Log("hopCD\t" + ableDict["hop"].IsReady + "\nskipCD\t" + ableDict["skip"].IsReady);		// show hop and skip cooldowns
+
+		zSpeed = transform.InverseTransformDirection (body.velocity).z;
 
 		// only move if the robot is alive
 		if (isAlive) {
@@ -93,12 +95,14 @@ public class PlayerMovement : MonoBehaviour {
 					transform.Rotate (-turnVector, Space.Self);
 				} else {
 					body.AddRelativeTorque (0, -((5 + thrust) / 20), 0);
+					fuel -= 1;
 				}
 			} else if (Input.GetKey (KeyCode.D)) {
 				if (IsGrounded()) {
 					transform.Rotate (turnVector, Space.Self);
 				} else {
 					body.AddRelativeTorque (0, ((5 + thrust) / 20), 0);
+					fuel -= 1;
 				}
 			}
 
@@ -117,7 +121,7 @@ public class PlayerMovement : MonoBehaviour {
 				// fire ventral thrusters if they are engaged with L-CTRL
 				} else if (Input.GetKey (KeyCode.LeftControl) && fuel > 0 && body.velocity.y < (float)(thrust)) {
 					body.AddRelativeForce (Vector3.up * (int)(2.5 * thrust + 150));
-					fuel -= 2;
+					fuel -= 8;
 					//Debug.Log (100 * fuel / (fuelCapacity * 500) + "% (ventral thrusters at " + (int)(2.5 * thrust + 150) + ")");
 				}
 			// execute a hop when the SPACE key is released
@@ -150,7 +154,7 @@ public class PlayerMovement : MonoBehaviour {
 					} else {
 						body.AddRelativeForce (Vector3.forward * (int)(5 * thrust + 25));
 					}
-					fuel -= 1;
+					fuel -= 4;
 					//Debug.Log (100 * fuel / (fuelCapacity * 500) + "% fuel (anterior thrusters at " + (int)(10 * thrust + 150) + ")");
 				}
 			// execute a skip when the L-SHIFT key is released
