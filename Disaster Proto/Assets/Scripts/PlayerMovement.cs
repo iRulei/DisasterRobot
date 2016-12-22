@@ -16,7 +16,12 @@ public class PlayerMovement : MonoBehaviour {
 	private float zSpeed;
 	private float hopPow;
 	private float skipPow;
-	private int fuel;
+	private float fuel;
+
+	public float ZSpeed { get { return zSpeed; } }
+	public float HopPow { get { return hopPow; } }
+	public float SkipPow { get { return skipPow; } }
+	public float Fuel { get { return fuel; } }
 
 	// COOLDOWNS
 	private Dictionary<string, RobotAbility> ableDict;
@@ -39,7 +44,7 @@ public class PlayerMovement : MonoBehaviour {
 		// initializes the robot
 		body = GetComponent<Rigidbody> ();
 		body.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
-		body.maxAngularVelocity = 1.5f;
+		body.maxAngularVelocity = (0.1f * thrust + 1.0f);
 		robotCollider = gameObject.GetComponent<BoxCollider> ();
 		groundRay = robotCollider.bounds.extents.y;
 		turnVector = new Vector3 (0, (float)(0.20 * efficiency + 0.70), 0);
@@ -63,8 +68,9 @@ public class PlayerMovement : MonoBehaviour {
 			
 		// Useful debugging output about the robot's status
 		//Debug.Log(zSpeed + "m/s");																	// show forward velocity
-		Debug.Log(body.angularVelocity);
+		//Debug.Log(body.angularVelocity);																// show angular velocity
 		//Debug.Log(IsGrounded());																		// show grounded state
+		Debug.Log(100 * (fuel / (fuelCapacity * 1000)) + "%");												// show fuel percentage
 		//Debug.Log("hopCD\t" + ableDict["hop"].IsReady + "\nskipCD\t" + ableDict["skip"].IsReady);		// show hop and skip cooldowns
 
 		zSpeed = transform.InverseTransformDirection (body.velocity).z;
