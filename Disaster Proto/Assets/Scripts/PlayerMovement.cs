@@ -18,6 +18,8 @@ public class PlayerMovement : MonoBehaviour {
 	private float skipPow;
 	private float fuel;
 
+	private bool canTilt;
+
 	public float ZSpeed { get { return zSpeed; } }
 	public float HopPow { get { return hopPow; } }
 	public float SkipPow { get { return skipPow; } }
@@ -27,6 +29,8 @@ public class PlayerMovement : MonoBehaviour {
 	private Dictionary<string, RobotAbility> ableDict;
 
 	private bool isAlive = true;
+
+	private bool hasGyro = true;
 
 	private Rigidbody body;
 	BoxCollider robotCollider;
@@ -70,7 +74,7 @@ public class PlayerMovement : MonoBehaviour {
 		//Debug.Log(zSpeed + "m/s");																	// show forward velocity
 		//Debug.Log(body.angularVelocity);																// show angular velocity
 		//Debug.Log(IsGrounded());																		// show grounded state
-		Debug.Log(100 * (fuel / (fuelCapacity * 1000)) + "%");												// show fuel percentage
+		//Debug.Log(100 * (fuel / (fuelCapacity * 1000)) + "%");										// show fuel percentage
 		//Debug.Log("hopCD\t" + ableDict["hop"].IsReady + "\nskipCD\t" + ableDict["skip"].IsReady);		// show hop and skip cooldowns
 
 		zSpeed = transform.InverseTransformDirection (body.velocity).z;
@@ -78,99 +82,167 @@ public class PlayerMovement : MonoBehaviour {
 		// only move if the robot is alive
 		if (isAlive) {
 
-			// stabilize the robot's movement along its Z-axis
-			if (!IsGrounded()) {
+			// GROUND CONTROLS
+			if (IsGrounded ()) {
+
+				// moving FORWARD and BACK on mechanical wheels
+				if (Input.GetKey (KeyCode.W) && zSpeed < (speed + 4)) {
+					body.AddRelativeForce (Vector3.forward * (5 * efficiency + 150));
+				} else if (Input.GetKey (KeyCode.S) && zSpeed < (speed + 2)) {
+					body.AddRelativeForce (Vector3.back * (5 * efficiency + 150));
+				}
+
+				// turning LEFT and RIGHT on mechanical wheels
+				if (Input.GetKey (KeyCode.A)) {
+					transform.Rotate (-turnVector, Space.Self);
+				} else if (Input.GetKey (KeyCode.D)) {
+					transform.Rotate (turnVector, Space.Self);
+				}
+
+				// building up and executing a HOP
+				if (!Input.GetKey (KeyCode.LeftControl) && ableDict ["hop"].IsReady) {
+					if (Input.GetKey (KeyCode.Space)) {
+						if (hopPow >= jump) {
+							hopPow = jump;
+						} else {
+							hopPow += (0.001f * efficiency) + 0.01f;
+						}
+					} else if (Input.GetKeyUp (KeyCode.Space)) {
+						hopPow = (int)hopPow;
+						Hop ();
+						hopPow = 0.0f;
+					}
+				}
+
+				// building up and executing a SKIP
+				if (!Input.GetKey (KeyCode.LeftControl) && ableDict ["skip"].IsReady) {
+					if (Input.GetKey (KeyCode.LeftShift)) {
+						if (skipPow >= jump) {
+							skipPow = jump;
+						} else {
+							skipPow += (0.001f * efficiency) + 0.01f;
+						}
+					} else if (Input.GetKeyUp (KeyCode.LeftShift)) {
+						skipPow = (int)skipPow;
+						Skip ();
+						skipPow = 0.0f;
+					}
+				}
+
+			// AIRBORNE CONTROLS
+			} else {
+
+				// stablize the robot's rotation and forward-backward movement
 				if (zSpeed > 0) {
 					body.AddRelativeForce (Vector3.back * 10);
 				} else if (zSpeed < 0) {
 					body.AddRelativeForce (Vector3.forward * 2);
 				}
-			}
 
-			// use W and S to move forward and back, limited by maximum speed
-			if (Input.GetKey (KeyCode.W) && IsGrounded() && zSpeed < (speed + 4)) {
-				body.AddRelativeForce (Vector3.forward * (5 * efficiency + 150));
-			} else if (Input.GetKey (KeyCode.S) && IsGrounded() && zSpeed < (speed + 2)) {
-				body.AddRelativeForce (Vector3.back * (5 * efficiency + 150));
-			}
-
-
-			// TURNING LEFT and RIGHT
-			if (Input.GetKey (KeyCode.A)) {
-				if (IsGrounded()) {
-					transform.Rotate (-turnVector, Space.Self);
-				} else {
+				// rotate CW and CCW around the y-axis
+				if (Input.GetKey (KeyCode.A)) {
 					body.AddRelativeTorque (0, -((5 + thrust) / 20), 0);
 					fuel -= 1;
-				}
-			} else if (Input.GetKey (KeyCode.D)) {
-				if (IsGrounded()) {
-					transform.Rotate (turnVector, Space.Self);
-				} else {
+				} else if (Input.GetKey (KeyCode.D)) {
 					body.AddRelativeTorque (0, ((5 + thrust) / 20), 0);
 					fuel -= 1;
 				}
 			}
 
-
-			// HOPPING and VENTRAL THRUSTERS
-			if (Input.GetKey (KeyCode.Space)) {
-				// build up / execute a hop if the robot is grounded and thrusters are NOT engaged
-				if (IsGrounded() && !Input.GetKey (KeyCode.LeftControl) && ableDict["hop"].IsReady) {
-					// grow hopping power only if it's not maxed out
-					if (hopPow >= jump) {
-						hopPow = jump;
-					} else {
-						hopPow += (0.001f * efficiency) + 0.01f;
-					}
-					Debug.Log ("building hop...\t" + hopPow);
-				// fire ventral thrusters if they are engaged with L-CTRL
-				} else if (Input.GetKey (KeyCode.LeftControl) && fuel > 0 && body.velocity.y < (float)(thrust)) {
+			// maneuver with thrusters
+			if (Input.GetKey (KeyCode.LeftControl) && fuel > 0) {
+				if (Input.GetKey (KeyCode.Space) && body.velocity.y < (float)(thrust)) {
 					body.AddRelativeForce (Vector3.up * (int)(2.5 * thrust + 150));
-					fuel -= 8;
-					//Debug.Log (100 * fuel / (fuelCapacity * 500) + "% (ventral thrusters at " + (int)(2.5 * thrust + 150) + ")");
+					fuel -= 5;
+				} else if (Input.GetKey (KeyCode.LeftShift) && zSpeed < (float)(thrust + 4)) {
+					body.AddRelativeForce (Vector3.forward * (int)(5 * thrust + 25));
+					fuel -= 3f;
 				}
-			// execute a hop when the SPACE key is released
-			} else if (Input.GetKeyUp (KeyCode.Space) && !Input.GetKey (KeyCode.LeftControl)) {
-				if (IsGrounded() && ableDict["hop"].IsReady) {
-					hopPow = (int)hopPow;
-					Hop ();
-				}
-				hopPow = 0f;
 			}
 
+//			// use W and S to move forward and back, limited by maximum speed
+//			if (Input.GetKey (KeyCode.W) && IsGrounded() && zSpeed < (speed + 4)) {
+//				body.AddRelativeForce (Vector3.forward * (5 * efficiency + 150));
+//			} else if (Input.GetKey (KeyCode.S) && IsGrounded() && zSpeed < (speed + 2)) {
+//				body.AddRelativeForce (Vector3.back * (5 * efficiency + 150));
+//			}
 
-			// SKIPPING and ANTERIOR THRUSTERS
-			if (Input.GetKey (KeyCode.LeftShift)) {
-				// build up / execute a skip if the robot is grounded and thrusters are NOT engaged
-				if (IsGrounded() && !Input.GetKey (KeyCode.LeftControl) && ableDict["skip"].IsReady) {
-					// grow skipping power only if it's not maxed out
-					if (skipPow >= jump) {
-						skipPow = jump;
-					} else {
-						//skipPow += (0.0005f * efficiency) + (0.025f * skipPow);
-						//skipPow += (0.0005f * efficiency) + (0.0125f * skipPow);
-						skipPow += (0.001f * efficiency) + 0.01f;
-					}
-					Debug.Log ("building skip...\t" + skipPow);
-				// fire anterior thrusters if they are engaged with L-CTRL
-				} else if (Input.GetKey (KeyCode.LeftControl) && fuel > 0 && zSpeed < (float)(thrust + 4)) {
-					if (IsGrounded()) {
-						body.AddRelativeForce (Vector3.forward * (int)(5 * thrust + 150));
-					} else {
-						body.AddRelativeForce (Vector3.forward * (int)(5 * thrust + 25));
-					}
-					fuel -= 4;
-					//Debug.Log (100 * fuel / (fuelCapacity * 500) + "% fuel (anterior thrusters at " + (int)(10 * thrust + 150) + ")");
-				}
-			// execute a skip when the L-SHIFT key is released
-			} else if (Input.GetKeyUp (KeyCode.LeftShift) && !Input.GetKey (KeyCode.LeftControl)) {
-				if (IsGrounded() && ableDict["skip"].IsReady) {
-					skipPow = (int)skipPow;
-					Skip ();
-				}
-				skipPow = 0f;
-			}
+
+//			// TURNING LEFT and RIGHT
+//			if (Input.GetKey (KeyCode.A)) {
+//				if (IsGrounded()) {
+//					transform.Rotate (-turnVector, Space.Self);
+//				} else {
+//					body.AddRelativeTorque (0, -((5 + thrust) / 20), 0);
+//					fuel -= 1;
+//				}
+//			} else if (Input.GetKey (KeyCode.D)) {
+//				if (IsGrounded()) {
+//					transform.Rotate (turnVector, Space.Self);
+//				} else {
+//					body.AddRelativeTorque (0, ((5 + thrust) / 20), 0);
+//					fuel -= 1;
+//				}
+//			}
+
+
+//			// HOPPING and VENTRAL THRUSTERS
+//			if (Input.GetKey (KeyCode.Space)) {
+//				// build up / execute a hop if the robot is grounded and thrusters are NOT engaged
+//				if (IsGrounded() && !Input.GetKey (KeyCode.LeftControl) && ableDict["hop"].IsReady) {
+//					// grow hopping power only if it's not maxed out
+//					if (hopPow >= jump) {
+//						hopPow = jump;
+//					} else {
+//						hopPow += (0.001f * efficiency) + 0.01f;
+//					}
+//				// fire ventral thrusters if they are engaged with L-CTRL
+//				} else if (Input.GetKey (KeyCode.LeftControl) && fuel > 0 && body.velocity.y < (float)(thrust)) {
+//					body.AddRelativeForce (Vector3.up * (int)(2.5 * thrust + 150));
+//					fuel -= 5;
+//					//Debug.Log (100 * fuel / (fuelCapacity * 500) + "% (ventral thrusters at " + (int)(2.5 * thrust + 150) + ")");
+//				}
+//			// execute a hop when the SPACE key is released
+//			} else if (Input.GetKeyUp (KeyCode.Space) && !Input.GetKey (KeyCode.LeftControl)) {
+//				if (IsGrounded() && ableDict["hop"].IsReady) {
+//					hopPow = (int)hopPow;
+//					Hop ();
+//				}
+//				hopPow = 0f;
+//			}
+
+
+//			// SKIPPING and ANTERIOR THRUSTERS
+//			if (Input.GetKey (KeyCode.LeftShift)) {
+//				// build up / execute a skip if the robot is grounded and thrusters are NOT engaged
+//				if (IsGrounded() && !Input.GetKey (KeyCode.LeftControl) && ableDict["skip"].IsReady) {
+//					// grow skipping power only if it's not maxed out
+//					if (skipPow >= jump) {
+//						skipPow = jump;
+//					} else {
+//						//skipPow += (0.0005f * efficiency) + (0.025f * skipPow);
+//						//skipPow += (0.0005f * efficiency) + (0.0125f * skipPow);
+//						skipPow += (0.001f * efficiency) + 0.01f;
+//					}
+//					Debug.Log ("building skip...\t" + skipPow);
+//				// fire anterior thrusters if they are engaged with L-CTRL
+//				} else if (Input.GetKey (KeyCode.LeftControl) && fuel > 0 && zSpeed < (float)(thrust + 4)) {
+//					if (IsGrounded()) {
+//						body.AddRelativeForce (Vector3.forward * (int)(5 * thrust + 150));
+//					} else {
+//						body.AddRelativeForce (Vector3.forward * (int)(5 * thrust + 25));
+//					}
+//					fuel -= 3;
+//					//Debug.Log (100 * fuel / (fuelCapacity * 500) + "% fuel (anterior thrusters at " + (int)(10 * thrust + 150) + ")");
+//				}
+//			// execute a skip when the L-SHIFT key is released
+//			} else if (Input.GetKeyUp (KeyCode.LeftShift) && !Input.GetKey (KeyCode.LeftControl)) {
+//				if (IsGrounded() && ableDict["skip"].IsReady) {
+//					skipPow = (int)skipPow;
+//					Skip ();
+//				}
+//				skipPow = 0f;
+//			}
 		}
 	} 
 
