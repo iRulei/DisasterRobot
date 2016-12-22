@@ -73,7 +73,8 @@ public class PlayerMovement : MonoBehaviour {
 		// Useful debugging output about the robot's status
 		//Debug.Log(zSpeed + "m/s");																	// show forward velocity
 		//Debug.Log(body.angularVelocity);																// show angular velocity
-		//Debug.Log(IsGrounded());																		// show grounded state
+		//Debug.Log(IsGrounded());																		// show grounded status
+		Debug.Log(GetHeight());																		// show distance to ground
 		//Debug.Log(100 * (fuel / (fuelCapacity * 1000)) + "%");										// show fuel percentage
 		//Debug.Log("hopCD\t" + ableDict["hop"].IsReady + "\nskipCD\t" + ableDict["skip"].IsReady);		// show hop and skip cooldowns
 
@@ -105,12 +106,12 @@ public class PlayerMovement : MonoBehaviour {
 						if (hopPow >= jump) {
 							hopPow = jump;
 						} else {
-							hopPow += (0.001f * efficiency) + 0.01f;
+							hopPow += (0.0015f * efficiency) + (0.0125f * hopPow);
 						}
 					} else if (Input.GetKeyUp (KeyCode.Space)) {
 						hopPow = (int)hopPow;
 						Hop ();
-						hopPow = 0.0f;
+						hopPow = 0f;
 					}
 				}
 
@@ -120,17 +121,19 @@ public class PlayerMovement : MonoBehaviour {
 						if (skipPow >= jump) {
 							skipPow = jump;
 						} else {
-							skipPow += (0.001f * efficiency) + 0.01f;
+							skipPow += (0.005f * efficiency) + 0.01f;
 						}
 					} else if (Input.GetKeyUp (KeyCode.LeftShift)) {
 						skipPow = (int)skipPow;
 						Skip ();
-						skipPow = 0.0f;
+						skipPow = 0f;
 					}
 				}
 
 			// AIRBORNE CONTROLS
 			} else {
+				hopPow = 0f;
+				skipPow = 0f;
 
 				// stablize the robot's rotation and forward-backward movement
 				if (zSpeed > 0) {
@@ -244,15 +247,25 @@ public class PlayerMovement : MonoBehaviour {
 //				skipPow = 0f;
 //			}
 		}
-	} 
+	}
+
+	// PHYSICAL STATUS CHECKS
 
 	bool IsGrounded() {
 		return Physics.Raycast (transform.position, Vector3.down, (float)(groundRay + 0.1f));
 	}
 
-//	void OnCollisionEnter(Collision col) {
-//		if (col.gameObject.tag == "Ground") { isGrounded = true; }
-//	}
+	float GetHeight() {
+		RaycastHit[] ground = Physics.RaycastAll (transform.position, Vector3.down);
+		if (ground [0].GetType() != null) {
+			return ground [0].distance;
+		}
+		return 0f;
+	}
+
+	void OnCollisionEnter(Collision col) {
+				
+	}
 
 	private void RegisterAbilities () {
 		ableDict.Add ("hop", new RobotAbility("hop", (1125 - efficiency * 125)));
