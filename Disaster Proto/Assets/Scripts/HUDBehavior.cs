@@ -8,14 +8,14 @@ using UnityEngine.UI;
 public class HUDBehavior : MonoBehaviour {
 
 	public GameObject fuelBar;
-	public MeshRenderer fuelMat;
+	private MeshRenderer fuelMaterial;
 	private float fuelPercentage;
+	public Material highFuel;
+	public Material midFuel;
+	public Material lowFuel;
 
-	public GameObject[] hopBars;
-	public MeshRenderer hopMat;
-
-	public GameObject[] skipBars;
-	public MeshRenderer skipMat;
+	private GameObject[] hopBars;
+	private GameObject[] skipBars;
 
 	public GameObject robot;
 	private PlayerMovement robotScript;
@@ -23,8 +23,8 @@ public class HUDBehavior : MonoBehaviour {
 
 	// Use this for initialization
 	void Start () {
-		fuelBar = GameObject.Find("Fuel Indicator");
-		fuelMat = fuelBar.GetComponent<MeshRenderer> ();
+
+		fuelMaterial = fuelBar.GetComponent<MeshRenderer> ();
 
 		hopBars = new GameObject[5];
 		skipBars = new GameObject[5];
@@ -33,26 +33,22 @@ public class HUDBehavior : MonoBehaviour {
 			skipBars [i] = GameObject.Find ("SB-" + (i + 1));
 		}
 
-		robot = GameObject.Find ("Robot");
 		robotScript = robot.GetComponent<PlayerMovement> ();
 		colorDict = new Dictionary<string, Color> ();
 
-		RegisterHUDColors ();
 	}
 	
 	// Update is called once per frame
 	void Update () {
 
-		//Debug.Log (fuelMat.material.ToString ());
-
 		// adjust the fuel bar to reflect the percentage of fuel the robot has left
 		fuelPercentage = robotScript.Fuel / (robotScript.fuelCapacity * 1000);
-		if (fuelPercentage > 0.75f) {
-			fuelMat.material.SetColor("_Emission", colorDict["fuel_green"]);
-		} else if (0.75f > fuelPercentage && fuelPercentage >= 0.50f) {
-			fuelMat.material.SetColor("_Emission", colorDict["fuel_yellow"]);
+		if (fuelPercentage > 0.67f) {
+			fuelMaterial.material = highFuel;
+		} else if (0.67f > fuelPercentage && fuelPercentage >= 0.33f) {
+			fuelMaterial.material = midFuel;
 		} else {
-			fuelMat.material.SetColor("_Emission", colorDict["fuel_red"]);
+			fuelMaterial.material = lowFuel;
 		}
 
 		fuelBar.transform.localScale = new Vector3(0.125f, 1.5f * (robotScript.Fuel / (robotScript.fuelCapacity * 1000)), 0.125f);
@@ -72,11 +68,12 @@ public class HUDBehavior : MonoBehaviour {
 				skipBars [i].SetActive (false);
 			}
 		}
+
 	}
 
-	void RegisterHUDColors() {
-		colorDict.Add ("fuel_green", new Color (0.6250f, 1.0000f, 0.6250f));
-		colorDict.Add ("fuel_yellow", new Color (1.0000f, 1.0000f, 0.5000f));
-		colorDict.Add ("fuel_red", new Color (1.0000f, 0.1875f, 0.1875f));
-	}
+//	void RegisterHUDColors() {
+//		colorDict.Add ("fuel_green", new Color (0.6250f, 1.0000f, 0.6250f));
+//		colorDict.Add ("fuel_yellow", new Color (1.0000f, 1.0000f, 0.5000f));
+//		colorDict.Add ("fuel_red", new Color (1.0000f, 0.1875f, 0.1875f));
+//	}
 }
