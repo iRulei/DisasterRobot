@@ -162,6 +162,11 @@ public class PlayerMovement : MonoBehaviour {
 					fuel -= 3f;
 				}
 			}
+
+			// DEV CHEATS
+			if (Input.GetKeyUp (KeyCode.F)) {
+				fuel = fuelCapacity * 1000;
+			}
 		}
 	}
 
@@ -173,7 +178,9 @@ public class PlayerMovement : MonoBehaviour {
 
 	public float GetHeight() {
 		RaycastHit[] ground = Physics.RaycastAll (transform.position, Vector3.down);
-		if (ground [0].GetType() != null) {
+		if (ground.Length == 0) {
+			return float.MaxValue;
+		} else if (ground [0].GetType() != null) {
 			return ground [0].distance;
 		}
 		return 0f;
