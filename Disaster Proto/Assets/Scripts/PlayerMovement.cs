@@ -11,19 +11,26 @@ public class PlayerMovement : MonoBehaviour {
 	public float thrust;
 	public float jump;
 	public float efficiency;
-	public int fuelCapacity;
+	public float fuelCapacity;
 
+	private float xSpeed;
+	private float ySpeed;
 	private float zSpeed;
 	private float hopPow;
 	private float skipPow;
 	private float fuel;
+	private float fuelTank;
 
+	private List<string> asmWheels = new List<string>() { "WHEELS_CART", "WHEELS_BALL" };
+	private string currentWheels;
+	private List<string> asmThrusters = new List<string>() { "THRUSTERS_SAGGITAL", "THRUSTERS_LATERAL", "THRUSTERS_AXIAL" };
+	private string currentThrusters;
 	private bool canTilt;
 
-	public float ZSpeed { get { return zSpeed; } }
 	public float HopPow { get { return hopPow; } }
 	public float SkipPow { get { return skipPow; } }
 	public float Fuel { get { return fuel; } }
+	public float FuelTank { get { return fuelTank; } }
 
 	// COOLDOWNS
 	private Dictionary<string, RobotAbility> ableDict;
@@ -58,7 +65,13 @@ public class PlayerMovement : MonoBehaviour {
 		RegisterAbilities ();
 		hopPow = 0;
 		skipPow = 0;
-		fuel = fuelCapacity * 1000;
+		fuelTank = 1000 * fuelCapacity + 3000;
+		fuel = (float)fuelTank;
+
+		// DEV EQUIPMENT
+		currentWheels = "WHEELS_BALL";
+		currentThrusters = "THRUSTERS_AXIAL";
+
 	}
 	
 	// Update is called once per frame
@@ -71,13 +84,17 @@ public class PlayerMovement : MonoBehaviour {
 		}
 			
 		// Useful debugging output about the robot's status
-		//Debug.Log(zSpeed + "m/s");																	// show forward velocity
+		//Debug.Log("x:\t" + xSpeed + "m/s");																	// show lateral velocity
+		Debug.Log("y:\t" + ySpeed + "m/s");																	// show vertical velocity
+		Debug.Log("z:\t" + zSpeed + "m/s");																	// show forward velocity
 		//Debug.Log(body.angularVelocity);																// show angular velocity
 		//Debug.Log(IsGrounded());																		// show grounded status
-		Debug.Log(GetHeight());																		// show distance to ground
+		//Debug.Log(GetHeight());																		// show distance to ground
 		//Debug.Log(100 * (fuel / (fuelCapacity * 1000)) + "%");										// show fuel percentage
 		//Debug.Log("hopCD\t" + ableDict["hop"].IsReady + "\nskipCD\t" + ableDict["skip"].IsReady);		// show hop and skip cooldowns
 
+		xSpeed = transform.InverseTransformDirection (body.velocity).x;
+		ySpeed = transform.InverseTransformDirection (body.velocity).y;
 		zSpeed = transform.InverseTransformDirection (body.velocity).z;
 
 		// only move if the robot is alive
@@ -87,17 +104,28 @@ public class PlayerMovement : MonoBehaviour {
 			if (IsGrounded ()) {
 
 				// moving FORWARD and BACK on mechanical wheels
-				if (Input.GetKey (KeyCode.W) && zSpeed < (speed + 4)) {
-					body.AddRelativeForce (Vector3.forward * (5 * efficiency + 150));
-				} else if (Input.GetKey (KeyCode.S) && -zSpeed < (speed + 2)) {
-					body.AddRelativeForce (Vector3.back * (5 * efficiency + 150));
+				if (currentWheels == "WHEELS_BALL" || currentWheels == "WHEELS_CART") {
+					if (Input.GetKey (KeyCode.W) && zSpeed < (speed + 4)) {
+						body.AddRelativeForce (Vector3.forward * (5 * efficiency + 150));
+					} else if (Input.GetKey (KeyCode.S) && -zSpeed < (speed + 2)) {
+						body.AddRelativeForce (Vector3.back * (5 * efficiency + 150));
+					}
 				}
 
-				// turning LEFT and RIGHT on mechanical wheels
-				if (Input.GetKey (KeyCode.A)) {
-					transform.Rotate (-turnVector, Space.Self);
-				} else if (Input.GetKey (KeyCode.D)) {
-					transform.Rotate (turnVector, Space.Self);
+				// strafing LEFT and RIGHT on mechanical wheels
+				if (currentWheels == "WHEELS_BALL") {
+					if (Input.GetKey (KeyCode.A) && -xSpeed < (speed + 2)) {
+						body.AddRelativeForce (Vector3.left * (5 * efficiency + 150));
+					} else if (Input.GetKey (KeyCode.D) && xSpeed < (speed + 2)) {
+						body.AddRelativeForce (Vector3.right * (5 * efficiency + 150));
+					}
+				}
+
+				// turning CCW and CW on mechanical wheels
+				if (Input.GetKey (KeyCode.Q)) {
+					transform.Rotate (new Vector3(0f, -(0.10f * efficiency + 0.50f), 0f), Space.Self);
+				} else if (Input.GetKey (KeyCode.E)) {
+					transform.Rotate (new Vector3(0f, (0.10f * efficiency + 0.50f), 0f), Space.Self);
 				}
 
 				// building up and executing a HOP
@@ -135,39 +163,77 @@ public class PlayerMovement : MonoBehaviour {
 				hopPow = 0f;
 				skipPow = 0f;
 
-				// stablize the robot's rotation and forward-backward movement
+				// stablize the robot's forward-backward movement
 				if (zSpeed > 0) {
 					body.AddRelativeForce (Vector3.back * 10);
 				} else if (zSpeed < 0) {
 					body.AddRelativeForce (Vector3.forward * 2);
 				}
 
-				// rotate CW and CCW around the y-axis
-				if (Input.GetKey (KeyCode.A)) {
-					body.AddRelativeTorque (0, -((5 + thrust) / 20), 0);
-					fuel -= 1;
-				} else if (Input.GetKey (KeyCode.D)) {
-					body.AddRelativeTorque (0, ((5 + thrust) / 20), 0);
-					fuel -= 1;
+				// stabilize the robot's left-right movement
+				if (xSpeed > 0) {
+					body.AddRelativeForce (Vector3.left * 5);
+				} else if (xSpeed < 0) {
+					body.AddRelativeForce (Vector3.right * 5);
+				}
+
+				// stabilize the robot's spin
+				if (body.angularVelocity.y > 0) {
+					body.AddRelativeTorque (0.0f, -(0.025f * thrust + 0.10f), 0.0f);
+				} else if (body.angularVelocity.y < 0) {
+					body.AddRelativeTorque (0.0f, (0.025f * thrust + 0.10f), 0.0f);
+				}
+
+				// moving FORWARD and BACK with saggital thrusters
+				if (currentThrusters == "THRUSTERS_AXIAL" || currentThrusters == "THRUSTERS_SAGGITAL") {
+					if (Input.GetKey (KeyCode.W)) {
+
+					} else if (Input.GetKey (KeyCode.S)) {
+
+					}
+				}
+
+				// strafing LEFT and RIGHT with lateral thrusters
+				if (currentThrusters == "THRUSTERS_AXIAL" || currentThrusters == "THRUSTERS_LATERAL") {
+					if (Input.GetKey (KeyCode.A)) {
+
+					} else if (Input.GetKey (KeyCode.D)) {
+
+					}
+				}
+
+				// rotating CCW and CW around the y-axis
+				if (Input.GetKey (KeyCode.Q)) {
+					// hold Q to rotate counter-clockwise (uses 1-2 fuel per tick)
+					body.AddRelativeTorque (0, -(0.05f * thrust + 0.25f), 0);
+					fuel -= (0.2f * thrust + 1.0f);
+				} else if (Input.GetKey (KeyCode.E)) {
+					// hold E to rotate clockwise (uses 1-2 fuel per tick)
+					body.AddRelativeTorque (0, (0.05f * thrust + 0.25f), 0);
+					fuel -= (0.2f * thrust + 1.0f);
 				}
 			}
 
-			// maneuver with thrusters
+			// engage and fire blast thrusters (will work regardless of IsGrounded())
 			if (Input.GetKey (KeyCode.LeftControl) && fuel > 0) {
-				if (Input.GetKey (KeyCode.Space) && body.velocity.y < (float)(thrust)) {
-					body.AddRelativeForce (Vector3.up * (int)(2.5 * thrust + 150));
-					fuel -= 5;
-				} else if (Input.GetKey (KeyCode.LeftShift) && zSpeed < (float)(thrust + 4)) {
-					body.AddRelativeForce (Vector3.forward * (int)(5 * thrust + 25));
-					fuel -= 3f;
+				// hold LeftControl to engage blast thrusters
+				if (Input.GetKey (KeyCode.Space) && ySpeed < (0.5f * thrust + 2.5f)) {
+					// hold Space to fire ventral blast thruster (uses 7-10 fuel per tick)
+					body.AddRelativeForce (Vector3.up * (int)(5 * thrust + 225));
+					fuel -= (0.6f * thrust + 7.0f);
+				} else if (Input.GetKey (KeyCode.LeftShift) && zSpeed < (1.25 * thrust + 5.25f)) {
+					// hold LeftShift to fire anterior blast thruster (uses 7-10 fuel per tick)
+					body.AddRelativeForce (Vector3.forward * (int)(5 * thrust + 75));
+					fuel -= (0.6f * thrust + 7.0f);
 				}
 			}
 
 			// DEV CHEATS
 			if (Input.GetKeyUp (KeyCode.F)) {
-				fuel = fuelCapacity * 1000;
+				fuel = fuelCapacity * fuelTank;
 			}
 		}
+
 	}
 
 	// PHYSICAL STATUS CHECKS

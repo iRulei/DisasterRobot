@@ -70,17 +70,17 @@ public class HUDBehavior : MonoBehaviour {
 	void Update () {
 
 		// adjust the fuel bar to reflect the percentage of fuel the robot has left
-		fuelPercentage = robotScript.Fuel / (robotScript.fuelCapacity * 1000);
-		if (fuelPercentage > 0.67f) {
+		fuelPercentage = robotScript.Fuel / robotScript.FuelTank;
+		if (fuelPercentage >= 0.67f) {
 			fuelMaterial.material = highFuel;
-		} else if (0.67f > fuelPercentage && fuelPercentage >= 0.33f) {
+		} else if (0.67f > fuelPercentage && fuelPercentage > 0.33f) {
 			fuelMaterial.material = midFuel;
 		} else {
 			fuelMaterial.material = lowFuel;
 		}
 
-		fuelBar.transform.localPosition = new Vector3(-2.85f, 0.7375f * (robotScript.Fuel / (robotScript.fuelCapacity * 1000)) - 1.475f, 2.8f);
-		fuelBar.transform.localScale = new Vector3(0.125f, 1.5f * (robotScript.Fuel / (robotScript.fuelCapacity * 1000)), 0.0625f);
+		fuelBar.transform.localPosition = new Vector3(-2.85f, 0.7375f * fuelPercentage - 1.475f, 2.8f);
+		fuelBar.transform.localScale = new Vector3(0.125f, 1.5f * fuelPercentage, 0.0625f);
 
 		for (int i = 0; i < 5; i++) {
 			// update the hop gauge based on the robot's current hopping power
