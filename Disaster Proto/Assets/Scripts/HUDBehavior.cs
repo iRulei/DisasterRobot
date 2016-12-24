@@ -70,7 +70,7 @@ public class HUDBehavior : MonoBehaviour {
 	void Update () {
 
 		// adjust the fuel bar to reflect the percentage of fuel the robot has left
-		fuelPercentage = robotScript.Fuel / robotScript.FuelTank;
+		fuelPercentage = robotScript.Fuel / robotScript.FuelCapacity;
 		if (fuelPercentage >= 0.67f) {
 			fuelMaterial.material = highFuel;
 		} else if (0.67f > fuelPercentage && fuelPercentage > 0.33f) {
@@ -85,18 +85,14 @@ public class HUDBehavior : MonoBehaviour {
 		for (int i = 0; i < 5; i++) {
 			// update the hop gauge based on the robot's current hopping power
 			if (robotScript.HopPow >= (i + 1)) {
-				//hopBars [i].SetActive (true);
 				hopMeshes[i].material = hopMats[i];
 			} else {
-				//hopBars [i].SetActive (false);
 				hopMeshes[i].material = empty;
 			}
 			// update the skip gauge based on the robot's current skipping power
 			if (robotScript.SkipPow >= (i + 1)) {
-				//skipBars [i].SetActive (true);
 				skipMeshes[i].material = skipMats[i];
 			} else {
-				//skipBars [i].SetActive (false);
 				skipMeshes[i].material = empty;
 			}
 		}
@@ -109,7 +105,18 @@ public class HUDBehavior : MonoBehaviour {
 
 		for (int i = 0; i < 5; i++) {
 			hopMeshes [i] = hopBars [i].GetComponent<MeshRenderer> ();	
+			if (robotScript.jump >= (i + 1)) {
+				hopBars [i].SetActive (true);
+			} else {
+				hopBars [i].SetActive (false);
+			}
+
 			skipMeshes [i] = skipBars [i].GetComponent<MeshRenderer> ();
+			if (robotScript.jump >= (i + 1)) {
+				skipBars [i].SetActive (true);
+			} else {
+				skipBars [i].SetActive (false);
+			}
 		}
 
 		hopMats [0] = hopOne;

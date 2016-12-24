@@ -7,73 +7,98 @@ using UnityEngine.SceneManagement;
 
 public class PlayerMovement : MonoBehaviour {
 
+	// the robot itself
+	private Rigidbody body;
+	private BoxCollider robotCollider;
+
+	// ROBOT STATS
 	public float speed;
 	public float thrust;
 	public float jump;
 	public float efficiency;
-	public float fuelCapacity;
+	public float fuelTank;
 
+	// FIXED STATUS VARIABLES
+	// kinematic
+	private float maxLandSpeed;
+	private float maxAirSpeed;
+	private float maxTilt;
+	private float maxSpin;
+	// equipment-related
+	private float boost;
+	private float fuel;
+	private float fuelCapacity;
+
+	// DYNAMIC STATUS VARIABLES
+	// kinematic
 	private float xSpeed;
 	private float ySpeed;
 	private float zSpeed;
-	private float hopPow;
-	private float skipPow;
-	private float fuel;
-	private float fuelTank;
+	private float xTilt;
+	private float yTilt;
+	private float zTilt;
+	// equipment-related
+	private float hopPow = 0f;
+	private float skipPow = 0f;
+	// vital
+	private bool isAlive = true;
 
+	// these represent the player's inventory, and should later be moved to another script
 	private List<string> asmWheels = new List<string>() { "WHEELS_CART", "WHEELS_BALL" };
-	private string currentWheels;
 	private List<string> asmThrusters = new List<string>() { "THRUSTERS_SAGGITAL", "THRUSTERS_LATERAL", "THRUSTERS_AXIAL" };
+	private List<string> asmMod = new List<string>() { "MOD_GYRO" };
+	private string currentWheels;
 	private string currentThrusters;
-	private bool canTilt;
+	private string currentMod;
 
+	// PROPERTIES FOR EXTERNAL ACCESS
+	public float Fuel { get { return fuel; } }
+	public float FuelCapacity { get { return fuelCapacity; } }
+	public float AngularVelocity { get { return body.angularVelocity.y; } }
+	public float MaxAngularVelocity { get { if (body != null) { return body.maxAngularVelocity; } else { return 0.0f; } } }
 	public float HopPow { get { return hopPow; } }
 	public float SkipPow { get { return skipPow; } }
-	public float Fuel { get { return fuel; } }
-	public float FuelTank { get { return fuelTank; } }
 
 	// COOLDOWNS
 	private Dictionary<string, RobotAbility> ableDict;
 
-	private bool isAlive = true;
 
-	private bool hasGyro = true;
 
-	private Rigidbody body;
-	BoxCollider robotCollider;
-	private Vector3 turnVector;
-	private float groundRay;
-
-//	private int sceneNum;
 
 	// Use this for initialization
 	void Start () {
 		
-		// fetches the current level number for reference later
-//		sceneNum = SceneManager.GetActiveScene ().buildIndex;
-
-		// initializes the robot
+		// sets up the robot
 		body = GetComponent<Rigidbody> ();
 		body.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
 		body.maxAngularVelocity = (0.1f * thrust + 1.0f);
 		robotCollider = gameObject.GetComponent<BoxCollider> ();
-		groundRay = robotCollider.bounds.extents.y;
-		turnVector = new Vector3 (0, (float)(0.20 * efficiency + 0.70), 0);
 
-		// sets up the robot's active parameters
+		// kinematic limitations
+		maxLandSpeed = speed + 4f;					// 5.0 - 9.0   m/s	forward velocity while driving
+		maxAirSpeed = 0.75f * thrust + 2.25f;		// 3.0 - 6.0   m/s	velocity while flying
+		maxTilt = 1.25f * efficiency + 28.75f;		// 30  - 35  deg	tilt during gyro operation
+		maxSpin = 0.1f * efficiency + 1.0f;			// 1.1 - 1.5 rad/s	angular velocity while flying
+		boost = 12.5f * thrust + 37.5f;				// 50  - 100   N	force of axial thrusters while flying
+
+		fuelCapacity = 1000 * fuelTank + 3000;
+		fuel = (float)fuelCapacity;
+
 		ableDict = new Dictionary<string, RobotAbility>();
 		RegisterAbilities ();
-		hopPow = 0;
-		skipPow = 0;
-		fuelTank = 1000 * fuelCapacity + 3000;
-		fuel = (float)fuelTank;
 
-		// DEV EQUIPMENT
+
+
+		// [!] DEV EQUIPMENT [!]
 		currentWheels = "WHEELS_BALL";
 		currentThrusters = "THRUSTERS_AXIAL";
+		currentMod = "MOD_GYRO";
 
 	}
-	
+
+
+
+
 	// Update is called once per frame
 	void Update () {
 		
@@ -82,53 +107,58 @@ public class PlayerMovement : MonoBehaviour {
 			Debug.Log ("killed by ABYSS");
 			isAlive = false;
 		}
-			
-		// Useful debugging output about the robot's status
-		//Debug.Log("x:\t" + xSpeed + "m/s");																	// show lateral velocity
-		Debug.Log("y:\t" + ySpeed + "m/s");																	// show vertical velocity
-		Debug.Log("z:\t" + zSpeed + "m/s");																	// show forward velocity
-		//Debug.Log(body.angularVelocity);																// show angular velocity
-		//Debug.Log(IsGrounded());																		// show grounded status
-		//Debug.Log(GetHeight());																		// show distance to ground
-		//Debug.Log(100 * (fuel / (fuelCapacity * 1000)) + "%");										// show fuel percentage
-		//Debug.Log("hopCD\t" + ableDict["hop"].IsReady + "\nskipCD\t" + ableDict["skip"].IsReady);		// show hop and skip cooldowns
 
+		ApplyCheats ();
+		DebugOutput ();
+
+		// the robot's velocity on each axis relative to itself
 		xSpeed = transform.InverseTransformDirection (body.velocity).x;
 		ySpeed = transform.InverseTransformDirection (body.velocity).y;
 		zSpeed = transform.InverseTransformDirection (body.velocity).z;
+		// x and z are swapped to make them agree with the robot's local axes
+		xTilt = transform.localRotation.eulerAngles.z;
+		yTilt = transform.localRotation.eulerAngles.y;
+		zTilt = transform.localRotation.eulerAngles.x;
 
-		// only move if the robot is alive
+
+
+		// [!] MAIN CONTROL ALGORITHM [!]
+		// only control the robot if it's alive
 		if (isAlive) {
 
 			// GROUND CONTROLS
 			if (IsGrounded ()) {
 
-				// moving FORWARD and BACK on mechanical wheels
-				if (currentWheels == "WHEELS_BALL" || currentWheels == "WHEELS_CART") {
-					if (Input.GetKey (KeyCode.W) && zSpeed < (speed + 4)) {
+				// MOVE FORWARD and BACK
+				if (currentWheels == "WHEELS_BALL" || currentWheels == "WHEELS_TANK" || currentWheels == "WHEELS_CART") {
+					if (Input.GetKey (KeyCode.W) && zSpeed < maxLandSpeed) {
 						body.AddRelativeForce (Vector3.forward * (5 * efficiency + 150));
-					} else if (Input.GetKey (KeyCode.S) && -zSpeed < (speed + 2)) {
+					} else if (Input.GetKey (KeyCode.S) && -zSpeed < (maxLandSpeed - 2)) {
 						body.AddRelativeForce (Vector3.back * (5 * efficiency + 150));
 					}
 				}
-
-				// strafing LEFT and RIGHT on mechanical wheels
+					
+				// MOVE LEFT and RIGHT
 				if (currentWheels == "WHEELS_BALL") {
-					if (Input.GetKey (KeyCode.A) && -xSpeed < (speed + 2)) {
+					if (Input.GetKey (KeyCode.A) && -xSpeed < (maxLandSpeed - 2)) {
 						body.AddRelativeForce (Vector3.left * (5 * efficiency + 150));
-					} else if (Input.GetKey (KeyCode.D) && xSpeed < (speed + 2)) {
+					} else if (Input.GetKey (KeyCode.D) && xSpeed < (maxLandSpeed - 2)) {
 						body.AddRelativeForce (Vector3.right * (5 * efficiency + 150));
 					}
 				}
-
-				// turning CCW and CW on mechanical wheels
-				if (Input.GetKey (KeyCode.Q)) {
-					transform.Rotate (new Vector3(0f, -(0.10f * efficiency + 0.50f), 0f), Space.Self);
-				} else if (Input.GetKey (KeyCode.E)) {
-					transform.Rotate (new Vector3(0f, (0.10f * efficiency + 0.50f), 0f), Space.Self);
+					
+				// ROTATE CW and CCW
+				if (Input.GetKey (KeyCode.Q) && -AngularVelocity < maxSpin) {
+					if ((currentWheels == "WHEELS_TANK" && body.velocity.magnitude < (speed / 2)) || currentWheels != "WHEELS_TANK") {
+						transform.Rotate (new Vector3(0f, -(0.10f * efficiency + 0.50f), 0f), Space.World);
+					}
+				} else if (Input.GetKey (KeyCode.E) && AngularVelocity < maxSpin) {
+					if ((currentWheels == "WHEELS_TANK" && body.velocity.magnitude < (speed / 2)) || currentWheels != "WHEELS_TANK") {
+						transform.Rotate (new Vector3(0f, (0.10f * efficiency + 0.50f), 0f), Space.World);
+					}
 				}
-
-				// building up and executing a HOP
+					
+				// HOP (build up and execute)
 				if (!Input.GetKey (KeyCode.LeftControl) && ableDict ["hop"].IsReady) {
 					if (Input.GetKey (KeyCode.Space)) {
 						if (hopPow >= jump) {
@@ -143,7 +173,7 @@ public class PlayerMovement : MonoBehaviour {
 					}
 				}
 
-				// building up and executing a SKIP
+				// SKIP (build up and execute)
 				if (!Input.GetKey (KeyCode.LeftControl) && ableDict ["skip"].IsReady) {
 					if (Input.GetKey (KeyCode.LeftShift)) {
 						if (skipPow >= jump) {
@@ -158,88 +188,166 @@ public class PlayerMovement : MonoBehaviour {
 					}
 				}
 
+
+
 			// AIRBORNE CONTROLS
 			} else {
+				
 				hopPow = 0f;
 				skipPow = 0f;
 
-				// stablize the robot's forward-backward movement
-				if (zSpeed > 0) {
-					body.AddRelativeForce (Vector3.back * 10);
-				} else if (zSpeed < 0) {
-					body.AddRelativeForce (Vector3.forward * 2);
+				// STABILIZE Z-DRIFT
+				if (zSpeed < 0) {
+					body.AddRelativeForce (Vector3.forward * (5 * thrust + 10));
+				} else {
+					body.AddRelativeForce (Vector3.back * (5 * thrust + 10));
 				}
 
-				// stabilize the robot's left-right movement
-				if (xSpeed > 0) {
-					body.AddRelativeForce (Vector3.left * 5);
-				} else if (xSpeed < 0) {
-					body.AddRelativeForce (Vector3.right * 5);
+				// STABILIZE X-DRIFT
+				if (xSpeed < 0) {
+					body.AddRelativeForce (Vector3.right * (5 * thrust + 10));
+				} else {
+					body.AddRelativeForce (Vector3.left * (5 * thrust + 10));
 				}
 
-				// stabilize the robot's spin
-				if (body.angularVelocity.y > 0) {
-					body.AddRelativeTorque (0.0f, -(0.025f * thrust + 0.10f), 0.0f);
-				} else if (body.angularVelocity.y < 0) {
-					body.AddRelativeTorque (0.0f, (0.025f * thrust + 0.10f), 0.0f);
+				// STABILIZE Y-SPIN
+				if (AngularVelocity > 0) {
+					body.AddRelativeTorque (0.0f, -(0.025f * thrust + 0.175f), 0.0f);
+				} else if (AngularVelocity < 0) {
+					body.AddRelativeTorque (0.0f, (0.025f * thrust + 0.175f), 0.0f);
+				}
+										
+
+
+				// ENGAGE AXIAL THRUSTERS
+				if (Input.GetKey (KeyCode.LeftControl) && fuel > 0) {
+
+					// MOVE FORWARD and BACK
+					if ((currentThrusters == "THRUSTERS_AXIAL" || currentThrusters == "THRUSTERS_SAGGITAL") && currentMod != "MOD_GYRO") {
+						if (Input.GetKey (KeyCode.W)) {
+							if (zSpeed < maxAirSpeed) {
+								body.AddRelativeForce (Vector3.forward * (int)boost);
+							}
+							fuel -= (0.2f * thrust + 2.0f);
+						} else if (Input.GetKey (KeyCode.S)) {
+							if (-zSpeed < maxAirSpeed) {
+								body.AddRelativeForce (Vector3.back * (int)boost);
+							}
+							fuel -= (0.2f * thrust + 2.0f);
+						}
+					}
+
+					// MOVE LEFT and RIGHT
+					if ((currentThrusters == "THRUSTERS_AXIAL" || currentThrusters == "THRUSTERS_LATERAL") && currentMod != "MOD_GYRO") {
+						if (Input.GetKey (KeyCode.A)) {
+							if (-xSpeed < maxAirSpeed) {
+								body.AddRelativeForce (Vector3.left * (int)boost);
+							}
+							fuel -= (0.2f * thrust + 2.0f);
+						} else if (Input.GetKey (KeyCode.D)) {
+							if (xSpeed < maxAirSpeed) {
+								body.AddRelativeForce (Vector3.right * (int)boost);
+							}
+							fuel -= (0.2f * thrust + 2.0f);
+						}
+					}
+					
+					// ROTATE CW and CCW
+					if (Input.GetKey (KeyCode.Q)) {
+						// hold Q to rotate counter-clockwise (uses 1-2 fuel per tick)
+						body.AddRelativeTorque (0, -(0.075f * thrust + 0.225f), 0);
+						fuel -= (0.2f * thrust + 1.0f);
+					} else if (Input.GetKey (KeyCode.E)) {
+						// hold E to rotate clockwise (uses 1-2 fuel per tick)
+						body.AddRelativeTorque (0, (0.075f * thrust + 0.25f), 0);
+						fuel -= (0.2f * thrust + 1.0f);
+					}
 				}
 
-				// moving FORWARD and BACK with saggital thrusters
-				if (currentThrusters == "THRUSTERS_AXIAL" || currentThrusters == "THRUSTERS_SAGGITAL") {
+
+
+				// GYROSCOPE MOD
+				if (currentMod == "MOD_GYRO") {
 					if (Input.GetKey (KeyCode.W)) {
-
+						// hold W to lean FORWARD
+						if (zSpeed <= maxAirSpeed) {
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (maxTilt * (0.75f + (Mathf.Abs(0.25f * zSpeed) / maxAirSpeed)), 0f, 0f), Time.deltaTime);
+						} 
 					} else if (Input.GetKey (KeyCode.S)) {
-
+						// hold S to lean BACK
+						if (-zSpeed <= maxAirSpeed) {
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (-maxTilt * (0.75f + (Mathf.Abs(0.25f * zSpeed) / maxAirSpeed)), 0f, 0f), Time.deltaTime);
+						}
 					}
-				}
 
-				// strafing LEFT and RIGHT with lateral thrusters
-				if (currentThrusters == "THRUSTERS_AXIAL" || currentThrusters == "THRUSTERS_LATERAL") {
 					if (Input.GetKey (KeyCode.A)) {
-
+						// hold A to lean LEFT
+						if (-xSpeed <= maxAirSpeed) {
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, maxTilt * (0.75f + (Mathf.Abs(0.25f * xSpeed) / maxAirSpeed))), Time.deltaTime);
+						}
 					} else if (Input.GetKey (KeyCode.D)) {
-
+						// hold D to lean RIGHT
+						if (xSpeed <= maxAirSpeed) {
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, -maxTilt * (0.75f + (Mathf.Abs(0.25f * xSpeed) / maxAirSpeed))), Time.deltaTime);
+						}
 					}
-				}
 
-				// rotating CCW and CW around the y-axis
-				if (Input.GetKey (KeyCode.Q)) {
-					// hold Q to rotate counter-clockwise (uses 1-2 fuel per tick)
-					body.AddRelativeTorque (0, -(0.05f * thrust + 0.25f), 0);
-					fuel -= (0.2f * thrust + 1.0f);
-				} else if (Input.GetKey (KeyCode.E)) {
-					// hold E to rotate clockwise (uses 1-2 fuel per tick)
-					body.AddRelativeTorque (0, (0.05f * thrust + 0.25f), 0);
-					fuel -= (0.2f * thrust + 1.0f);
+					// CORRECT LEANING
+					if (zSpeed > maxAirSpeed) {
+						transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)), 0f, 0f), Time.deltaTime);
+					} else if (-zSpeed > maxAirSpeed) {
+						transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (-maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)), 0f, 0f), Time.deltaTime);
+					}
+					if (-xSpeed > maxAirSpeed) {
+						transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed))), Time.deltaTime);
+					} else if (xSpeed > maxAirSpeed) {
+						transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, -maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed))), Time.deltaTime);
+					}
 				}
 			}
 
-			// engage and fire blast thrusters (will work regardless of IsGrounded())
+
+
+			// STABILIZE THE ROBOT'S PITCH (zTilt) AND ROLL (xTilt) WITHOUT AFFECTING ITS YAW (yTilt)
+			Vector3 tempVec3 = transform.localRotation.eulerAngles;
+			tempVec3.x *= 0;	// the robot's xTilt will lerp toward 0, evening out its roll
+			tempVec3.y *= 1;	// the robot's yTilt will be unaffected, allowing it to rotate
+			tempVec3.z *= 0;	// the robot's zTilt will lerp toward 0, evening out its pitch
+			transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (tempVec3), Time.deltaTime);
+
+
+
+			// ENGAGE BLAST THRUSTERS
 			if (Input.GetKey (KeyCode.LeftControl) && fuel > 0) {
 				// hold LeftControl to engage blast thrusters
-				if (Input.GetKey (KeyCode.Space) && ySpeed < (0.5f * thrust + 2.5f)) {
-					// hold Space to fire ventral blast thruster (uses 7-10 fuel per tick)
+				if (Input.GetKey (KeyCode.Space) && body.velocity.y < maxAirSpeed) {
+					// hold Space to fire ventral blast thruster and move UPWARD 3-6m/s (uses 7-10 fuel per tick)
 					body.AddRelativeForce (Vector3.up * (int)(5 * thrust + 225));
 					fuel -= (0.6f * thrust + 7.0f);
-				} else if (Input.GetKey (KeyCode.LeftShift) && zSpeed < (1.25 * thrust + 5.25f)) {
-					// hold LeftShift to fire anterior blast thruster (uses 7-10 fuel per tick)
+				} else if (Input.GetKey (KeyCode.LeftShift) && zSpeed < (maxAirSpeed * 2)) {
+					// hold LeftShift to fire anterior blast thruster and move FORWARD 6-12m/s (uses 7-10 fuel per tick)
 					body.AddRelativeForce (Vector3.forward * (int)(5 * thrust + 75));
 					fuel -= (0.6f * thrust + 7.0f);
 				}
 			}
 
+
+
 			// DEV CHEATS
 			if (Input.GetKeyUp (KeyCode.F)) {
-				fuel = fuelCapacity * fuelTank;
+				fuel = fuelCapacity;
 			}
 		}
 
 	}
 
-	// PHYSICAL STATUS CHECKS
+
+
+
+	// PHYSICAL STATUS CHECKS //
 
 	public bool IsGrounded() {
-		return Physics.Raycast (transform.position, Vector3.down, (float)(groundRay + 0.1f));
+		return Physics.Raycast (transform.position, Vector3.down, (float)(robotCollider.bounds.extents.y + 0.1f));
 	}
 
 	public float GetHeight() {
@@ -256,8 +364,15 @@ public class PlayerMovement : MonoBehaviour {
 				
 	}
 
+
+
+
+	// ABILITIES //
+
 	private void RegisterAbilities () {
+		// Hop has a cooldown of 1000-500ms
 		ableDict.Add ("hop", new RobotAbility("hop", (1125 - efficiency * 125)));
+		// Skip has a cooldown of 1000-500ms
 		ableDict.Add ("skip", new RobotAbility ("skip", (1125 - efficiency * 125)));
 	}
 
@@ -268,7 +383,7 @@ public class PlayerMovement : MonoBehaviour {
 		}
 		ableDict["hop"].ActivateCoolDown();
 	}
-
+		
 	// launches the robot forward in an arc
 	private void Skip() {
 		if (skipPow > 0) {
@@ -276,6 +391,30 @@ public class PlayerMovement : MonoBehaviour {
 		}
 		ableDict["skip"].ActivateCoolDown();
 	}
+
+
+
+	// CHEATS AND DEBUGGING
+
+	private void ApplyCheats() {
+		fuel = fuelCapacity;																			// refill fuel each tick								
+	}
+
+	private void DebugOutput() {
+//		Debug.Log("xSpeed:\t" + (int)xSpeed + "m/s");													// show lateral velocity
+//		Debug.Log("ySpeed:\t" + (int)ySpeed + "m/s");													// show vertical velocity
+//		Debug.Log("zSpeed:\t" + (int)zSpeed + "m/s");													// show forward velocity
+//		Debug.Log("xTilt:\t" + (int)xTilt);																// show local X tilt
+//		Debug.Log("yTilt:\t" + (int)yTilt);																// show local Y tilt
+//		Debug.Log("zTilt:\t" + (int)zTilt);																// show local Z tilt
+//		Debug.Log(angularVelocity);																		// show angular velocity
+//		Debug.Log(IsGrounded());																		// show grounded status
+//		Debug.Log(GetHeight());																			// show distance to ground
+//		Debug.Log(100 * (fuel / fuelCapacity) + "%");													// show fuel percentage
+	}
+
+
+
 
 	/// <summary>
 	/// A wrapper class for a robot ability, including a string name, a cooldown, and a boolean indicating whether the ability's has recovered from cooldown.
