@@ -37,6 +37,7 @@ public class PlayerMovement : MonoBehaviour {
 	private float xTilt;
 	private float yTilt;
 	private float zTilt;
+	private Vector3 localEulers;
 	// equipment-related
 	private float hopPow = 0f;
 	private float skipPow = 0f;
@@ -45,8 +46,8 @@ public class PlayerMovement : MonoBehaviour {
 
 	// these represent the player's inventory, and should later be moved to another script
 	private List<string> asmWheels = new List<string>() { "WHEELS_CART", "WHEELS_BALL" };
-	private List<string> asmThrusters = new List<string>() { "THRUSTERS_SAGGITAL", "THRUSTERS_LATERAL", "THRUSTERS_AXIAL" };
-	private List<string> asmMod = new List<string>() { "MOD_GYRO" };
+	private List<string> asmThrusters = new List<string>() { "THRUSTERS_SAGGITAL", "THRUSTERS_LATERAL", "THRUSTERS_AXIAL", "THRUSTERS_GYROSCOPIC" };
+	private List<string> asmMod = new List<string>() { };
 	private string currentWheels;
 	private string currentThrusters;
 	private string currentMod;
@@ -77,12 +78,14 @@ public class PlayerMovement : MonoBehaviour {
 		// kinematic limitations
 		maxLandSpeed = speed + 4f;					// 5.0 - 9.0   m/s	forward velocity while driving
 		maxAirSpeed = 0.75f * thrust + 2.25f;		// 3.0 - 6.0   m/s	velocity while flying
-		maxTilt = 1.25f * efficiency + 58.75f;		// 60  - 65  deg	tilt during gyro operation
+		maxTilt = 1.25f * efficiency + 38.75f;		// 40  - 45  deg	tilt during gyro operation
 		maxSpin = 0.1f * efficiency + 1.0f;			// 1.1 - 1.5 rad/s	angular velocity while flying
 		boost = 12.5f * thrust + 37.5f;				// 50  - 100   N	force of axial thrusters while flying
 
 		fuelCapacity = 1000 * fuelTank + 3000;
 		fuel = (float)fuelCapacity;
+
+		localEulers = Vector3.zero;
 
 		ableDict = new Dictionary<string, RobotAbility>();
 		RegisterAbilities ();
@@ -91,8 +94,7 @@ public class PlayerMovement : MonoBehaviour {
 
 		// [!] DEV EQUIPMENT [!]
 		currentWheels = "WHEELS_BALL";
-		currentThrusters = "THRUSTERS_AXIAL";
-		currentMod = "MOD_GYRO";
+		currentThrusters = "THRUSTERS_GYROSCOPIC";
 
 	}
 
@@ -119,6 +121,8 @@ public class PlayerMovement : MonoBehaviour {
 		xTilt = transform.localRotation.eulerAngles.z;
 		yTilt = transform.localRotation.eulerAngles.y;
 		zTilt = transform.localRotation.eulerAngles.x;
+		// the robot's current local rotational angles
+		localEulers = transform.localRotation.eulerAngles;
 
 
 
@@ -223,30 +227,30 @@ public class PlayerMovement : MonoBehaviour {
 				if (Input.GetKey (KeyCode.LeftControl) && fuel > 0) {
 
 					// MOVE FORWARD and BACK
-					if ((currentThrusters == "THRUSTERS_AXIAL" || currentThrusters == "THRUSTERS_SAGGITAL") && currentMod != "MOD_GYRO") {
+					if ((currentThrusters == "THRUSTERS_AXIAL" || currentThrusters == "THRUSTERS_SAGGITAL")) {
 						if (Input.GetKey (KeyCode.W)) {
 							if (zSpeed < maxAirSpeed) {
-								body.AddRelativeForce (Vector3.forward * (int)boost);
+								body.AddRelativeForce (Vector3.forward * boost);
 							}
 							fuel -= (0.2f * thrust + 2.0f);
 						} else if (Input.GetKey (KeyCode.S)) {
 							if (-zSpeed < maxAirSpeed) {
-								body.AddRelativeForce (Vector3.back * (int)boost);
+								body.AddRelativeForce (Vector3.back * boost);
 							}
 							fuel -= (0.2f * thrust + 2.0f);
 						}
 					}
 
 					// MOVE LEFT and RIGHT
-					if ((currentThrusters == "THRUSTERS_AXIAL" || currentThrusters == "THRUSTERS_LATERAL") && currentMod != "MOD_GYRO") {
+					if ((currentThrusters == "THRUSTERS_AXIAL" || currentThrusters == "THRUSTERS_LATERAL")) {
 						if (Input.GetKey (KeyCode.A)) {
 							if (-xSpeed < maxAirSpeed) {
-								body.AddRelativeForce (Vector3.left * (int)boost);
+								body.AddRelativeForce (Vector3.left * boost);
 							}
 							fuel -= (0.2f * thrust + 2.0f);
 						} else if (Input.GetKey (KeyCode.D)) {
 							if (xSpeed < maxAirSpeed) {
-								body.AddRelativeForce (Vector3.right * (int)boost);
+								body.AddRelativeForce (Vector3.right * boost);
 							}
 							fuel -= (0.2f * thrust + 2.0f);
 						}
@@ -255,56 +259,81 @@ public class PlayerMovement : MonoBehaviour {
 					// ROTATE CW and CCW
 					if (Input.GetKey (KeyCode.Q)) {
 						// hold Q to rotate counter-clockwise (uses 1-2 fuel per tick)
-						body.AddRelativeTorque (0, -(0.075f * thrust + 0.225f), 0);
+						body.AddRelativeTorque (Vector3.down * (0.075f * thrust + 0.225f));
 						fuel -= (0.2f * thrust + 1.0f);
 					} else if (Input.GetKey (KeyCode.E)) {
 						// hold E to rotate clockwise (uses 1-2 fuel per tick)
-						body.AddRelativeTorque (0, (0.075f * thrust + 0.25f), 0);
+						body.AddRelativeTorque (Vector3.up * (0.075f * thrust + 0.225f));
 						fuel -= (0.2f * thrust + 1.0f);
 					}
 				}
 
 
 
-				// GYROSCOPE MOD
-				if (currentMod == "MOD_GYRO") {
+				// GYROSCOPIC THRUSTER CONTROL
+				if (currentThrusters == "THRUSTERS_GYROSCOPIC") {
 					if (Input.GetKey (KeyCode.W)) {
-						// hold W to lean FORWARD
-						if (zSpeed <= maxAirSpeed) {
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (maxTilt * (0.75f + (Mathf.Abs(0.25f * zSpeed) / maxAirSpeed)), 0f, 0f), Time.deltaTime);
+						// hold W to lean FORWARD												// WHEN YOU RETURN: the problem is that this Lerp pushes toward WORLD'S x-axis every time DESPITE starting from your LOCAL axes.
+						if (zSpeed <= maxAirSpeed) {											//					you need to find a way to have this lerp command translate your LOCAL axes into WORLD axes.
+							Vector3 forwardTempWaxing = localEulers;
+							forwardTempWaxing.x += (maxTilt * (0.75f + (Mathf.Abs(0.25f * zSpeed) / maxAirSpeed)));
+							forwardTempWaxing.y += 0f;
+							forwardTempWaxing.z += 0f;
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (forwardTempWaxing), Time.deltaTime);
 						} else {
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)), 0f, 0f), Time.deltaTime);
+							Vector3 forwardTempWaning = localEulers;
+							forwardTempWaning.x += (maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)));
+							forwardTempWaning.y += 0f;
+							forwardTempWaning.z += 0f;
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (forwardTempWaning), Time.deltaTime);
 						}
 					} else if (Input.GetKey (KeyCode.S)) {
 						// hold S to lean BACK
 						if (-zSpeed <= maxAirSpeed) {
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (-maxTilt * (0.75f + (Mathf.Abs (0.25f * zSpeed) / maxAirSpeed)), 0f, 0f), Time.deltaTime);
+							Vector3 backTempWaxing = localEulers;
+							backTempWaxing.x -= (maxTilt * (0.75f + (Mathf.Abs(0.25f * zSpeed) / maxAirSpeed)));
+							backTempWaxing.y += 0f;
+							backTempWaxing.z += 0f;
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (backTempWaxing), Time.deltaTime);
 						} else {
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (-maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)), 0f, 0f), Time.deltaTime);
+							Vector3 backTempWaning = localEulers;
+							backTempWaning.x -= (maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)));
+							backTempWaning.y += 0f;
+							backTempWaning.z += 0f;
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (backTempWaning), Time.deltaTime);
 						}
 					}
 
 					if (Input.GetKey (KeyCode.A)) {
 						// hold A to lean LEFT
 						if (-xSpeed <= maxAirSpeed) {
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, maxTilt * (0.75f + (Mathf.Abs (0.25f * xSpeed) / maxAirSpeed))), Time.deltaTime);
+							Vector3 leftTempWaxing = localEulers;
+							leftTempWaxing.x += 0f;
+							leftTempWaxing.y += 0f;
+							leftTempWaxing.z += (maxTilt * (0.75f + (Mathf.Abs(0.25f * xSpeed) / maxAirSpeed)));
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (leftTempWaxing), Time.deltaTime);
 						} else {
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed))), Time.deltaTime);
+							Vector3 leftTempWaning = localEulers;
+							leftTempWaning.x += 0f;
+							leftTempWaning.y += 0f;
+							leftTempWaning.z += (maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed)));
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (leftTempWaning), Time.deltaTime);
 						}
 					} else if (Input.GetKey (KeyCode.D)) {
 						// hold D to lean RIGHT
 						if (xSpeed <= maxAirSpeed) {
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, -maxTilt * (0.75f + (Mathf.Abs (0.25f * xSpeed) / maxAirSpeed))), Time.deltaTime);
+							Vector3 rightTempWaxing = localEulers;
+							rightTempWaxing.x += 0f;
+							rightTempWaxing.y += 0f;
+							rightTempWaxing.z -= (maxTilt * (0.75f + (Mathf.Abs(0.25f * xSpeed) / maxAirSpeed)));
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (rightTempWaxing), Time.deltaTime);
 						} else {
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, -maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed))), Time.deltaTime);
+							Vector3 rightTempWaning = localEulers;
+							rightTempWaning.x += 0f;
+							rightTempWaning.y += 0f;
+							rightTempWaning.z -= (maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed)));
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (rightTempWaning), Time.deltaTime);
 						}
-					}
-
-					// CORRECT LEANING
-					 else if (-zSpeed > maxAirSpeed) {
-					}
-					if (-xSpeed > maxAirSpeed) {
-					} else if (xSpeed > maxAirSpeed) {
 					}
 				}
 			}
@@ -312,11 +341,11 @@ public class PlayerMovement : MonoBehaviour {
 
 
 			// STABILIZE THE ROBOT'S PITCH (zTilt) AND ROLL (xTilt) WITHOUT AFFECTING ITS YAW (yTilt)
-			Vector3 tempVec3 = transform.localRotation.eulerAngles;
-			tempVec3.x *= 0;	// the robot's xTilt will lerp toward 0, evening out its roll
-			tempVec3.y *= 1;	// the robot's yTilt will be unaffected, allowing it to rotate
-			tempVec3.z *= 0;	// the robot's zTilt will lerp toward 0, evening out its pitch
-			transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (tempVec3), Time.deltaTime);
+			Vector3 stableTemp = localEulers;
+			stableTemp.x *= 0;	// the robot's xTilt will lerp toward 0, evening out its roll
+			stableTemp.y *= 1;	// the robot's yTilt will be unaffected, allowing it to rotate
+			stableTemp.z *= 0;	// the robot's zTilt will lerp toward 0, evening out its pitch
+			transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (stableTemp), Time.deltaTime);
 
 
 
@@ -339,6 +368,20 @@ public class PlayerMovement : MonoBehaviour {
 			// DEV CHEATS
 			if (Input.GetKeyUp (KeyCode.F)) {
 				fuel = fuelCapacity;
+			} else if (Input.GetKey (KeyCode.Alpha1)) {
+				currentWheels = "WHEELS_TANK";
+			} else if (Input.GetKey (KeyCode.Alpha2)) {
+				currentWheels = "WHEELS_CART";
+			} else if (Input.GetKey (KeyCode.Alpha3)) {
+				currentWheels = "WHEELS_BALL";
+			} else if (Input.GetKey (KeyCode.Z)) {
+				currentThrusters = "THRUSTERS_LATERAL";
+			} else if (Input.GetKey (KeyCode.C)) {
+				currentThrusters = "THRUSTERS_SAGGITAL";
+			} else if (Input.GetKey (KeyCode.X)) {
+				currentThrusters = "THRUSTERS_AXIAL";
+			} else if (Input.GetKey (KeyCode.G)) {
+				currentThrusters = "THRUSTERS_GYROSCOPIC";
 			}
 		}
 
@@ -404,17 +447,18 @@ public class PlayerMovement : MonoBehaviour {
 	}
 
 	private void DebugOutput() {
-		Debug.Log("xSpeed:\t" + (int)xSpeed + "m/s");													// show lateral velocity
+//		Debug.Log("xSpeed:\t" + (int)xSpeed + "m/s");													// show lateral velocity
 //		Debug.Log("ySpeed:\t" + (int)ySpeed + "m/s");													// show vertical velocity
-		Debug.Log("zSpeed:\t" + (int)zSpeed + "m/s");													// show forward velocity
-		Debug.Log("maxAir:\t" + (int)maxAirSpeed + "m/s");												// show maxAirSpeed
-//		Debug.Log("xTilt:\t" + (int)xTilt);																// show local X tilt
-//		Debug.Log("yTilt:\t" + (int)yTilt);																// show local Y tilt
-//		Debug.Log("zTilt:\t" + (int)zTilt);																// show local Z tilt
+//		Debug.Log("zSpeed:\t" + (int)zSpeed + "m/s");													// show forward velocity
+//		Debug.Log("maxAir:\t" + (int)maxAirSpeed + "m/s");												// show maxAirSpeed
+		Debug.Log("xTilt:\t" + (int)localEulers.x);																// show local X tilt
+		Debug.Log("yTilt:\t" + (int)localEulers.y);																// show local Y tilt
+		Debug.Log("zTilt:\t" + (int)localEulers.z);																// show local Z tilt
 //		Debug.Log(angularVelocity);																		// show angular velocity
 //		Debug.Log(IsGrounded());																		// show grounded status
 //		Debug.Log(GetHeight());																			// show distance to ground
 //		Debug.Log(100 * (fuel / fuelCapacity) + "%");													// show fuel percentage
+//		Debug.Log(currentWheels + " | " + currentThrusters);											// show equipment
 	}
 
 
