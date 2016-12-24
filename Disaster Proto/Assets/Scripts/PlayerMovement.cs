@@ -77,7 +77,7 @@ public class PlayerMovement : MonoBehaviour {
 		// kinematic limitations
 		maxLandSpeed = speed + 4f;					// 5.0 - 9.0   m/s	forward velocity while driving
 		maxAirSpeed = 0.75f * thrust + 2.25f;		// 3.0 - 6.0   m/s	velocity while flying
-		maxTilt = 1.25f * efficiency + 28.75f;		// 30  - 35  deg	tilt during gyro operation
+		maxTilt = 1.25f * efficiency + 58.75f;		// 60  - 65  deg	tilt during gyro operation
 		maxSpin = 0.1f * efficiency + 1.0f;			// 1.1 - 1.5 rad/s	angular velocity while flying
 		boost = 12.5f * thrust + 37.5f;				// 50  - 100   N	force of axial thrusters while flying
 
@@ -272,36 +272,39 @@ public class PlayerMovement : MonoBehaviour {
 						// hold W to lean FORWARD
 						if (zSpeed <= maxAirSpeed) {
 							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (maxTilt * (0.75f + (Mathf.Abs(0.25f * zSpeed) / maxAirSpeed)), 0f, 0f), Time.deltaTime);
-						} 
+						} else {
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)), 0f, 0f), Time.deltaTime);
+						}
 					} else if (Input.GetKey (KeyCode.S)) {
 						// hold S to lean BACK
 						if (-zSpeed <= maxAirSpeed) {
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (-maxTilt * (0.75f + (Mathf.Abs(0.25f * zSpeed) / maxAirSpeed)), 0f, 0f), Time.deltaTime);
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (-maxTilt * (0.75f + (Mathf.Abs (0.25f * zSpeed) / maxAirSpeed)), 0f, 0f), Time.deltaTime);
+						} else {
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (-maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)), 0f, 0f), Time.deltaTime);
 						}
 					}
 
 					if (Input.GetKey (KeyCode.A)) {
 						// hold A to lean LEFT
 						if (-xSpeed <= maxAirSpeed) {
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, maxTilt * (0.75f + (Mathf.Abs(0.25f * xSpeed) / maxAirSpeed))), Time.deltaTime);
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, maxTilt * (0.75f + (Mathf.Abs (0.25f * xSpeed) / maxAirSpeed))), Time.deltaTime);
+						} else {
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed))), Time.deltaTime);
 						}
 					} else if (Input.GetKey (KeyCode.D)) {
 						// hold D to lean RIGHT
 						if (xSpeed <= maxAirSpeed) {
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, -maxTilt * (0.75f + (Mathf.Abs(0.25f * xSpeed) / maxAirSpeed))), Time.deltaTime);
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, -maxTilt * (0.75f + (Mathf.Abs (0.25f * xSpeed) / maxAirSpeed))), Time.deltaTime);
+						} else {
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, -maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed))), Time.deltaTime);
 						}
 					}
 
 					// CORRECT LEANING
-					if (zSpeed > maxAirSpeed) {
-						transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)), 0f, 0f), Time.deltaTime);
-					} else if (-zSpeed > maxAirSpeed) {
-						transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (-maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)), 0f, 0f), Time.deltaTime);
+					 else if (-zSpeed > maxAirSpeed) {
 					}
 					if (-xSpeed > maxAirSpeed) {
-						transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed))), Time.deltaTime);
 					} else if (xSpeed > maxAirSpeed) {
-						transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (0f, 0f, -maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed))), Time.deltaTime);
 					}
 				}
 			}
@@ -401,9 +404,10 @@ public class PlayerMovement : MonoBehaviour {
 	}
 
 	private void DebugOutput() {
-//		Debug.Log("xSpeed:\t" + (int)xSpeed + "m/s");													// show lateral velocity
+		Debug.Log("xSpeed:\t" + (int)xSpeed + "m/s");													// show lateral velocity
 //		Debug.Log("ySpeed:\t" + (int)ySpeed + "m/s");													// show vertical velocity
-//		Debug.Log("zSpeed:\t" + (int)zSpeed + "m/s");													// show forward velocity
+		Debug.Log("zSpeed:\t" + (int)zSpeed + "m/s");													// show forward velocity
+		Debug.Log("maxAir:\t" + (int)maxAirSpeed + "m/s");												// show maxAirSpeed
 //		Debug.Log("xTilt:\t" + (int)xTilt);																// show local X tilt
 //		Debug.Log("yTilt:\t" + (int)yTilt);																// show local Y tilt
 //		Debug.Log("zTilt:\t" + (int)zTilt);																// show local Z tilt
