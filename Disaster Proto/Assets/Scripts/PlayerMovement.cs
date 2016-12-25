@@ -12,11 +12,11 @@ public class PlayerMovement : MonoBehaviour {
 	private BoxCollider robotCollider;
 
 	// ROBOT STATS
-	public float speed;
-	public float thrust;
-	public float jump;
-	public float efficiency;
-	public float fuelTank;
+	public int speed;
+	public int thrust;
+	public int jump;
+	public int efficiency;
+	public int fuelTank;
 
 	// FIXED STATUS VARIABLES
 	// kinematic
@@ -76,11 +76,11 @@ public class PlayerMovement : MonoBehaviour {
 		robotCollider = gameObject.GetComponent<BoxCollider> ();
 
 		// kinematic limitations
-		maxLandSpeed = speed + 4f;					// 5.0 - 9.0   m/s	forward velocity while driving
-		maxAirSpeed = 0.75f * thrust + 2.25f;		// 3.0 - 6.0   m/s	velocity while flying
-		maxTilt = 1.25f * efficiency + 38.75f;		// 40  - 45  deg	tilt during gyro operation
-		maxSpin = 0.1f * efficiency + 1.0f;			// 1.1 - 1.5 rad/s	angular velocity while flying
-		boost = 12.5f * thrust + 37.5f;				// 50  - 100   N	force of axial thrusters while flying
+		maxLandSpeed = speed + 4f;					//  5.0 - 9.0   m/s	forward velocity while driving
+		maxAirSpeed = 0.75f * thrust + 2.25f;		//  3.0 - 6.0   m/s	velocity while flying
+		maxTilt = 1.25f * efficiency + 31.25f;		// 32.5 -37.5 deg	tilt during gyro operation
+		maxSpin = 0.1f * efficiency + 1.0f;			//  1.1 - 1.5 rad/s	angular velocity while flying
+		boost = 12.5f * thrust + 37.5f;				// 50.0 -100    N	force of axial thrusters while flying
 
 		fuelCapacity = 1000 * fuelTank + 3000;
 		fuel = (float)fuelCapacity;
@@ -94,7 +94,7 @@ public class PlayerMovement : MonoBehaviour {
 
 		// [!] DEV EQUIPMENT [!]
 		currentWheels = "WHEELS_BALL";
-		currentThrusters = "THRUSTERS_GYROSCOPIC";
+		currentThrusters = "THRUSTERS_AXIAL";
 
 	}
 
@@ -273,66 +273,47 @@ public class PlayerMovement : MonoBehaviour {
 				// GYROSCOPIC THRUSTER CONTROL
 				if (currentThrusters == "THRUSTERS_GYROSCOPIC") {
 					if (Input.GetKey (KeyCode.W)) {
-						// hold W to lean FORWARD												// WHEN YOU RETURN: the problem is that this Lerp pushes toward WORLD'S x-axis every time DESPITE starting from your LOCAL axes.
-						if (zSpeed <= maxAirSpeed) {											//					you need to find a way to have this lerp command translate your LOCAL axes into WORLD axes.
-							Vector3 forwardTempWaxing = localEulers;
-							forwardTempWaxing.x += (maxTilt * (0.75f + (Mathf.Abs(0.25f * zSpeed) / maxAirSpeed)));
-							forwardTempWaxing.y += 0f;
-							forwardTempWaxing.z += 0f;
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (forwardTempWaxing), Time.deltaTime);
+						// hold W to lean FORWARD
+						Vector3 forwardTilt = localEulers;
+						if (zSpeed <= maxAirSpeed) {
+							forwardTilt.x += (maxTilt * (0.85f + (Mathf.Abs(0.15f * zSpeed) / maxAirSpeed)));
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (forwardTilt), Time.deltaTime);
 						} else {
-							Vector3 forwardTempWaning = localEulers;
-							forwardTempWaning.x += (maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)));
-							forwardTempWaning.y += 0f;
-							forwardTempWaning.z += 0f;
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (forwardTempWaning), Time.deltaTime);
+							forwardTilt.x += (maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)));
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (forwardTilt), Time.deltaTime);
 						}
 					} else if (Input.GetKey (KeyCode.S)) {
 						// hold S to lean BACK
+						Vector3 backTilt = localEulers;
 						if (-zSpeed <= maxAirSpeed) {
-							Vector3 backTempWaxing = localEulers;
-							backTempWaxing.x -= (maxTilt * (0.75f + (Mathf.Abs(0.25f * zSpeed) / maxAirSpeed)));
-							backTempWaxing.y += 0f;
-							backTempWaxing.z += 0f;
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (backTempWaxing), Time.deltaTime);
+							backTilt.x -= (maxTilt * (0.85f + (Mathf.Abs(0.15f * zSpeed) / maxAirSpeed)));
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (backTilt), Time.deltaTime);
 						} else {
 							Vector3 backTempWaning = localEulers;
-							backTempWaning.x -= (maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)));
-							backTempWaning.y += 0f;
-							backTempWaning.z += 0f;
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (backTempWaning), Time.deltaTime);
+							backTilt.x -= (maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)));
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (backTilt), Time.deltaTime);
 						}
 					}
 
 					if (Input.GetKey (KeyCode.A)) {
 						// hold A to lean LEFT
+						Vector3 leftTilt = localEulers;
 						if (-xSpeed <= maxAirSpeed) {
-							Vector3 leftTempWaxing = localEulers;
-							leftTempWaxing.x += 0f;
-							leftTempWaxing.y += 0f;
-							leftTempWaxing.z += (maxTilt * (0.75f + (Mathf.Abs(0.25f * xSpeed) / maxAirSpeed)));
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (leftTempWaxing), Time.deltaTime);
+							leftTilt.z += (maxTilt * (0.85f + (Mathf.Abs(0.15f * xSpeed) / maxAirSpeed)));
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (leftTilt), Time.deltaTime);
 						} else {
-							Vector3 leftTempWaning = localEulers;
-							leftTempWaning.x += 0f;
-							leftTempWaning.y += 0f;
-							leftTempWaning.z += (maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed)));
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (leftTempWaning), Time.deltaTime);
+							leftTilt.z += (maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed)));
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (leftTilt), Time.deltaTime);
 						}
 					} else if (Input.GetKey (KeyCode.D)) {
 						// hold D to lean RIGHT
+						Vector3 rightTilt = localEulers;
 						if (xSpeed <= maxAirSpeed) {
-							Vector3 rightTempWaxing = localEulers;
-							rightTempWaxing.x += 0f;
-							rightTempWaxing.y += 0f;
-							rightTempWaxing.z -= (maxTilt * (0.75f + (Mathf.Abs(0.25f * xSpeed) / maxAirSpeed)));
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (rightTempWaxing), Time.deltaTime);
+							rightTilt.z -= (maxTilt * (0.85f + (Mathf.Abs(0.15f * xSpeed) / maxAirSpeed)));
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (rightTilt), Time.deltaTime);
 						} else {
-							Vector3 rightTempWaning = localEulers;
-							rightTempWaning.x += 0f;
-							rightTempWaning.y += 0f;
-							rightTempWaning.z -= (maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed)));
-							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (rightTempWaning), Time.deltaTime);
+							rightTilt.z -= (maxTilt * (maxAirSpeed / Mathf.Abs (xSpeed)));
+							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (rightTilt), Time.deltaTime);
 						}
 					}
 				}
@@ -420,6 +401,8 @@ public class PlayerMovement : MonoBehaviour {
 		ableDict.Add ("hop", new RobotAbility("hop", (1125 - efficiency * 125)));
 		// Skip has a cooldown of 1000-500ms
 		ableDict.Add ("skip", new RobotAbility ("skip", (1125 - efficiency * 125)));
+		// Parachute has a cooldown of 30000-20000ms
+		ableDict.Add ("parachute", new RobotAbility ("parachute", (32500 - efficiency * 2500)));
 	}
 
 	// launches the robot straight into the air
@@ -443,7 +426,7 @@ public class PlayerMovement : MonoBehaviour {
 	// CHEATS AND DEBUGGING
 
 	private void ApplyCheats() {
-		fuel = fuelCapacity;																			// refill fuel each tick								
+//		fuel = fuelCapacity;																			// refill fuel each tick								
 	}
 
 	private void DebugOutput() {
@@ -451,9 +434,9 @@ public class PlayerMovement : MonoBehaviour {
 //		Debug.Log("ySpeed:\t" + (int)ySpeed + "m/s");													// show vertical velocity
 //		Debug.Log("zSpeed:\t" + (int)zSpeed + "m/s");													// show forward velocity
 //		Debug.Log("maxAir:\t" + (int)maxAirSpeed + "m/s");												// show maxAirSpeed
-		Debug.Log("xTilt:\t" + (int)localEulers.x);																// show local X tilt
-		Debug.Log("yTilt:\t" + (int)localEulers.y);																// show local Y tilt
-		Debug.Log("zTilt:\t" + (int)localEulers.z);																// show local Z tilt
+//		Debug.Log("xTilt:\t" + (int)localEulers.x);														// show local X tilt
+//		Debug.Log("yTilt:\t" + (int)localEulers.y);														// show local Y tilt
+//		Debug.Log("zTilt:\t" + (int)localEulers.z);														// show local Z tilt
 //		Debug.Log(angularVelocity);																		// show angular velocity
 //		Debug.Log(IsGrounded());																		// show grounded status
 //		Debug.Log(GetHeight());																			// show distance to ground
