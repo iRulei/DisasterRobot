@@ -24,10 +24,10 @@ public class CameraMovement : MonoBehaviour {
 		float yaw = 0f;
 		// the (+) assignments make the camera lead the robot while turning, and the (-) assignments make it lag behind
 		if (robotScript.AngularVelocity < 0f) {
-			yaw = Mathf.Max (15f * (robotScript.AngularVelocity / robotScript.MaxAngularVelocity), -15f);
+//			yaw = Mathf.Max (15f * (robotScript.AngularVelocity / robotScript.MaxAngularVelocity), -15f);
 //			yaw = -Mathf.Max (15f * (robotScript.AngularVelocity / robotScript.MaxAngularVelocity), -15f);
 		} else if (robotScript.AngularVelocity > 0f) {
-			yaw = Mathf.Min (15f * (robotScript.AngularVelocity / robotScript.MaxAngularVelocity), 15f);
+//			yaw = Mathf.Min (15f * (robotScript.AngularVelocity / robotScript.MaxAngularVelocity), 15f);
 //			yaw = -Mathf.Min (15f * (robotScript.AngularVelocity / robotScript.MaxAngularVelocity), 15f);
 		} else {
 			yaw = 0f;
@@ -35,17 +35,10 @@ public class CameraMovement : MonoBehaviour {
 		// lerp the camera's angle based on the pitch and yaw calculated above
 		transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (pitch, yaw, 0f), Time.deltaTime * 2);
 
-		// sink can range from 15.0 to 7.5.  the robot's height above the ground changes this angle from 0-40m.
-		float sink = Mathf.Min (11 + 4 * (robotScript.GetHeight () / 40), 15);
-		float creep = Mathf.Min (-7 + 5 * (robotScript.GetHeight () / 40), -2);
+		// the camera will sink from y- can range from 15.0 to 7.5.  the robot's height above the ground changes this value.
+		float sink = Mathf.Max (15 - 4 * (robotScript.GetHeight () / 40), 11);
+		float creep = Mathf.Min (-2 - 5 * (robotScript.GetHeight () / 40), -7);
 		transform.localPosition = Vector3.Lerp (transform.localPosition, new Vector3 (0f, sink, creep), Time.deltaTime);
-
-//		Debug.Log (robotTrans.localRotation.z);
-//		Debug.Log("pitch:\t" + pitch);						// show pitch angle
-//		Debug.Log("yaw:\t" + yaw);							// show yaw angle
-//		Debug.Log("roll:\t" + roll);						// show roll angle
-//		Debug.Log("sink:\t" + sink);						// show sink level
-
 
 	}
 }
