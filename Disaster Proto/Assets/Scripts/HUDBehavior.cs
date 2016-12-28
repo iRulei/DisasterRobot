@@ -7,47 +7,61 @@ using UnityEngine.UI;
 
 public class HUDBehavior : MonoBehaviour {
 
-	public GameObject fuelBar;
-	private MeshRenderer fuelMaterial;
+	// [!] LEFT DISPLAY MEMBERS [!]
+
 	private float fuelPercentage;
+	private int fuelTimer = 0;
+	private bool blinkerState = true;
+	public GameObject fuelGauge;
+	private MeshRenderer fuelMaterial;
 	public Material highFuel;
 	public Material midFuel;
 	public Material lowFuel;
 
-	private GameObject[] hopBars;
+	private float hpPercentage;
+	public GameObject hpGauge;
+
+	// [!] RIGHT DISPLAY MEMBERS [!]
+
 	private GameObject[] skipBars;
-	private MeshRenderer[] hopMeshes;
 	private MeshRenderer[] skipMeshes;
-	private MeshRenderer hopOneMat;
-	private MeshRenderer hopTwoMat;
-	private MeshRenderer hopThreeMat;
-	private MeshRenderer hopFourMat;
-	private MeshRenderer hopFiveMat;
 	private MeshRenderer skipOneMat;
 	private MeshRenderer skipTwoMat;
 	private MeshRenderer skipThreeMat;
 	private MeshRenderer skipFourMat;
 	private MeshRenderer skipFiveMat;
-	private Material[] hopMats;
 	private Material[] skipMats;
-	public Material hopFive;
-	public Material hopFour;
-	public Material hopThree;
-	public Material hopTwo;
-	public Material hopOne;
 	public Material skipFive;
 	public Material skipFour;
 	public Material skipThree;
 	public Material skipTwo;
 	public Material skipOne;
-	public Material empty;
+
+	private GameObject[] hopBars;
+	private MeshRenderer[] hopMeshes;
+	private MeshRenderer hopOneMat;
+	private MeshRenderer hopTwoMat;
+	private MeshRenderer hopThreeMat;
+	private MeshRenderer hopFourMat;
+	private MeshRenderer hopFiveMat;
+	private Material[] hopMats;
+	public Material hopFive;
+	public Material hopFour;
+	public Material hopThree;
+	public Material hopTwo;
+	public Material hopOne;
+
+
+
+	// [!] GENERAL MEMBERS [!]
 
 	public GameObject robot;
 	private PlayerMovement robotScript;
 	private Dictionary<string, Material> matDict;
 
-	private int fuelTimer = 0;
-	private bool blinkerState = true;
+	public Material empty;
+
+
 
 	// Use this for initialization
 	void Start () {
@@ -75,33 +89,40 @@ public class HUDBehavior : MonoBehaviour {
 		// adjust the fuel bar to reflect the percentage of fuel the robot has left
 		fuelPercentage = robotScript.Fuel / robotScript.FuelCapacity;
 		if (fuelPercentage >= 0.67f) {
+			fuelGauge.SetActive (true);
 			fuelMaterial.material = highFuel;
 		} else if (0.67f > fuelPercentage && fuelPercentage > 0.33f) {
+			fuelGauge.SetActive (true);
 			fuelMaterial.material = midFuel;
 		} else if (0.33f >= fuelPercentage && fuelPercentage > 0.00f) {
 			fuelMaterial.material = lowFuel;
 			if (fuelTimer < fuelPercentage * 100) {
 				++fuelTimer;
 			} else {
-				fuelBar.SetActive (blinkerState);
+				fuelGauge.SetActive (blinkerState);
 				blinkerState = !blinkerState;
 				fuelTimer = 0;
 			}
 		} else {
+			fuelGauge.SetActive (true);
 			fuelMaterial.material = empty;
 		}
-			
-		fuelBar.transform.localPosition = new Vector3(-0.33f, 0.5f * fuelPercentage - 0.49f, -1f);
-		fuelBar.transform.localScale = new Vector3(0.25f, fuelPercentage, 6f);
+		fuelGauge.transform.localPosition = new Vector3(0f, 0.5f * fuelPercentage - 0.5f, -1f);
+		fuelGauge.transform.localScale = new Vector3(0.5f, fuelPercentage, 6f);
 
+		// adjust the integrity bar to reflect the robot's current integrity
+		hpPercentage = robotScript.HitPoints / robotScript.MaxHitPoints;
+		hpGauge.transform.localScale = new Vector3 (0.98f * hpPercentage, 2f, 0.5f);
+
+
+
+		// light up the hop and skip bars based on the robot's current HopPow and SkipPow
 		for (int i = 0; i < 5; i++) {
-			// update the hop gauge based on the robot's current hopping power
 			if (robotScript.HopPow >= (i + 1)) {
 				hopMeshes[i].material = hopMats[i];
 			} else {
 				hopMeshes[i].material = empty;
 			}
-			// update the skip gauge based on the robot's current skipping power
 			if (robotScript.SkipPow >= (i + 1)) {
 				skipMeshes[i].material = skipMats[i];
 			} else {
@@ -109,12 +130,20 @@ public class HUDBehavior : MonoBehaviour {
 			}
 		}
 
+		// adjust the vertical velocity indicator
+//		float climbPercentage = 1 - (1 / (Mathf.Abs(robotScript.YSpeed) + 1));
+//		if (robotScript.YSpeed < 0) {
+//			climbPercentage *= -1;
+//		}
+//		v_yGauge.transform.localPosition = new Vector3 (0f, 0.25f * climbPercentage, -1f);
+//		v_yGauge.transform.localScale = new Vector3 (0.25f, 0.5f * climbPercentage, 6f);
+
 	}
 
 	void RegisterMaterials() {
 
 		// assign fuel
-		fuelMaterial = fuelBar.GetComponent<MeshRenderer> ();
+		fuelMaterial = fuelGauge.GetComponent<MeshRenderer> ();
 
 		// set the active states of each hop/skip bar
 		for (int i = 0; i < 5; i++) {

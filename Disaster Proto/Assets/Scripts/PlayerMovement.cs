@@ -12,6 +12,7 @@ public class PlayerMovement : MonoBehaviour {
 	private BoxCollider robotCollider;
 
 	// ROBOT STATS
+	public int integrity;
 	public int speed;
 	public int thrust;
 	public int jump;
@@ -28,6 +29,9 @@ public class PlayerMovement : MonoBehaviour {
 	private float boost;
 	private float fuel;
 	private float fuelCapacity;
+	// vital
+	private int hitPoints;
+	private int maxHitPoints;
 
 	// DYNAMIC STATUS VARIABLES
 	// kinematic
@@ -53,10 +57,18 @@ public class PlayerMovement : MonoBehaviour {
 	private string currentMod;
 
 	// PROPERTIES FOR EXTERNAL ACCESS
-	public float Fuel { get { return fuel; } }
-	public float FuelCapacity { get { return fuelCapacity; } }
+	public Rigidbody Body { get { return body; } }
 	public float AngularVelocity { get { return body.angularVelocity.y; } }
 	public float MaxAngularVelocity { get { if (body != null) { return body.maxAngularVelocity; } else { return 0.0f; } } }
+	public float MaxLandSpeed { get { return maxLandSpeed; } }
+	public float MaxAirSpeed { get { return maxAirSpeed; } }
+	public float Fuel { get { return fuel; } }
+	public float FuelCapacity { get { return fuelCapacity; } }
+	public float HitPoints { get { return hitPoints; } }
+	public float MaxHitPoints { get { return maxHitPoints; } }
+	public float XSpeed { get { return xSpeed; } }
+	public float YSpeed { get { return ySpeed; } }
+	public float ZSpeed { get { return zSpeed; } }
 	public float HopPow { get { return hopPow; } }
 	public float SkipPow { get { return skipPow; } }
 
@@ -82,8 +94,10 @@ public class PlayerMovement : MonoBehaviour {
 		maxSpin = 0.1f * efficiency + 1.0f;			//  1.1 - 1.5 rad/s	angular velocity while flying
 		boost = 12.5f * thrust + 37.5f;				// 50.0 -100    N	force of axial thrusters while flying
 
-		fuelCapacity = 1000 * fuelTank + 3000;
+		fuelCapacity = 1000 * fuelTank + 3000;		// 4000 - 8000 units
 		fuel = (float)fuelCapacity;
+		maxHitPoints = 250 * integrity + 750;		// 1000 - 2000 hp
+		hitPoints = maxHitPoints;
 
 		localEulers = Vector3.zero;
 
@@ -105,11 +119,16 @@ public class PlayerMovement : MonoBehaviour {
 	void Update () {
 		
 		// kill the robot if they've fallen into the void
-		if (isAlive && body.position.y < -100) {
-			Debug.Log ("killed by ABYSS");
-			isAlive = false;
+		if (isAlive) {
+			if (body.position.y < -100) {
+				Debug.Log ("killed by ABYSS");
+				isAlive = false;
+			} else if (hitPoints < 0) {
+				Debug.Log ("killed by IMPACT");
+				isAlive = false;
+			}
 		}
-
+		
 		ApplyCheats ();
 		DebugOutput ();
 
@@ -289,7 +308,6 @@ public class PlayerMovement : MonoBehaviour {
 							backTilt.x -= (maxTilt * (0.85f + (Mathf.Abs(0.15f * zSpeed) / maxAirSpeed)));
 							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (backTilt), Time.deltaTime);
 						} else {
-							Vector3 backTempWaning = localEulers;
 							backTilt.x -= (maxTilt * (maxAirSpeed / Mathf.Abs (zSpeed)));
 							transform.localRotation = Quaternion.Lerp (transform.localRotation, Quaternion.Euler (backTilt), Time.deltaTime);
 						}
@@ -388,7 +406,7 @@ public class PlayerMovement : MonoBehaviour {
 	}
 
 	void OnCollisionEnter(Collision col) {
-				
+		hitPoints -= (int)Mathf.Sqrt((xSpeed * xSpeed) + (ySpeed * ySpeed) + (zSpeed * zSpeed));
 	}
 
 
